@@ -2,7 +2,7 @@
 fastapi==0.120.3           # Pydantic v2 原生支持，最新稳定版 :contentReference[oaicite:1]{index=1}
 uvicorn[standard]==0.38.0  # 支持 Python 3.14 的最新版 ASGI 服务器 :contentReference[oaicite:2]{index=2}
 pydantic==2.12.3           # FastAPI v0.12x 线适配的 v2 系列最新版 :contentReference[oaicite:3]{index=3}
-pydantic-settings==2.6.1   # Pydantic 设置管理
+pydantic-settings==2.10.1   # Pydantic 设置管理
 
 # ===== LangChain / LangGraph 1.x 系列 =====
 langchain==1.0.3           # LangChain v1 稳定版（2025-10-29） :contentReference[oaicite:4]{index=4}
