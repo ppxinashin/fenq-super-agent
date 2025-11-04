@@ -1,0 +1,36 @@
+# ===== Core runtime (Python >= 3.10 per LangChain/LangGraph v1) =====
+fastapi==0.120.3           # Pydantic v2 原生支持，最新稳定版 :contentReference[oaicite:1]{index=1}
+uvicorn[standard]==0.38.0  # 支持 Python 3.14 的最新版 ASGI 服务器 :contentReference[oaicite:2]{index=2}
+pydantic==2.12.3           # FastAPI v0.12x 线适配的 v2 系列最新版 :contentReference[oaicite:3]{index=3}
+pydantic-settings==2.10.1   # Pydantic 设置管理
+
+# ===== LangChain / LangGraph 1.x 系列 =====
+langchain==1.0.3           # LangChain v1 稳定版（2025-10-29） :contentReference[oaicite:4]{index=4}
+langgraph==1.0.2           # LangGraph v1 稳定版（2025-10-29） :contentReference[oaicite:5]{index=5}
+langgraph-prebuilt==1.0.2  # 可选：LangGraph 高阶预置组件 :contentReference[oaicite:6]{index=6}
+
+# ===== Model provider integrations（与 LangChain 解耦的官方整合包）=====
+langchain-openai==1.0.1    # LangChain x OpenAI 集成包（2025-10-21） :contentReference[oaicite:9]{index=9}
+dashscope==1.24.7          # 阿里云大模型
+langchain-community==0.4   # 社区模型
+
+# ===== Vector store: PGVector（LangChain v1 新拆分包）=====
+langchain-postgres==0.0.16 # 官方 Postgres/PGVector 集成包（2025-10-17） :contentReference[oaicite:13]{index=13}
+langgraph-checkpoint-postgres==3.0.0           # LangChain Postgres 短期记忆
+psycopg[binary]==3.2.12    # PostgreSQL 驱动（3.x；二进制加速） :contentReference[oaicite:14]{index=14}
+
+# ===== RAG / Tools / Crawling =====
+beautifulsoup4==4.14.2     # 网页解析 :contentReference[oaicite:15]{index=15}
+playwright==1.48.0         # 无头浏览器自动化（安装后需 `playwright install`） :contentReference[oaicite:16]{index=16}
+ddgs==9.6.1                # DuckDuckGo 搜索库（duckduckgo-search 新包名） :contentReference[oaicite:17]{index=17}
+
+# ===== PDF / 文档处理 =====
+pypdf==6.1.3               # PyPDF2 已弃用，使用 pypdf 最新版 :contentReference[oaicite:18]{index=18}
+
+# ===== State / 序列化 / 其他 =====
+langgraph-checkpoint-redis==0.1.2 # LangChain Redis 短期记忆
+msgpack==1.1.0             # 轻量高性能序列化 :contentReference[oaicite:20]{index=20}
+loguru==0.7.3              # 便捷日志库 :contentReference[oaicite:21]{index=21}
+python-dotenv==1.2.1       # 读取 .env 配置 :contentReference[oaicite:22]{index=22}
+requests==2.32.5           # 通用 HTTP 客户端（LangChain 外独立调用 MCP/REST）
+langmem==0.0.3             # LangChain 长期记忆
