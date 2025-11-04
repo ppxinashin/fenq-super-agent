@@ -44,6 +44,14 @@ class Settings(BaseSettings):
             f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+        
+    @property
+    def postgres_connection_string2(self) -> str:
+        """生成 PostgreSQL 连接字符串"""
+        return (
+            f"postgresql://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
 
     # ===== Redis 配置 =====
     redis_host: str = Field(default="localhost", description="Redis 主机")
