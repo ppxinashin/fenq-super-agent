@@ -41,7 +41,7 @@ def main_handler(event, context):
         
         # 检查事件类型
         event_name = record.get('event', {}).get('eventName', '')
-        if event_name != 'cos:ObjectCreated:Put':
+        if event_name != 'cos:ObjectCreated:Put' and event_name != 'cos: ObjectCreated:Put':
             return {
                 'statusCode': 200,
                 'body': {
@@ -55,6 +55,7 @@ def main_handler(event, context):
         object_info = cos_info.get('cosObject', {})
         
         bucket_name = bucket_info.get('name', '')
+        app_id = bucket_info.get('app_id', '')
         object_key = object_info.get('key', '')
         object_size = object_info.get('size', 0)
         content_type = object_info.get('meta', {}).get('Content-Type', '')
@@ -69,7 +70,10 @@ def main_handler(event, context):
         region = context.get("tencentcloud_region", 'ap-singapore')
         
         # 合成 COS 对象访问链接 样例 https://suagent-xxx.cos.ap-singapore.myqcloud.com/documents/example.pdf
-        cos_url = f"https://{bucket_name}.cos.{region}.myqcloud.com/{object_key}"
+        if app_id:
+            cos_url = f"https://{bucket_name}-{app_id}.cos.{region}.myqcloud.com/{object_key}"
+        else:
+            cos_url = f"https://{bucket_name}.cos.{region}.myqcloud.com/{object_key}"
         
         # 进行回调测试
         print(f"正在测试链接: {cos_url}")
