@@ -6,8 +6,7 @@ import os
 from typing import List, Optional
 from io import BytesIO
 
-from langchain_community.embeddings import DashScopeEmbeddings
-from langchain_postgres.vectorstores import PGVector
+from src.memory import PGVectorMemory
 from langchain_core.documents import Document
 
 from src.config import settings
@@ -29,15 +28,7 @@ class MinioEventListener:
         """初始化事件监听器"""
         self.logger = get_logger(__name__)
         self.minio_client = MyMinio()
-        self.embeddings = DashScopeEmbeddings(
-            model=settings.embedding_model,
-            dashscope_api_key=settings.dashscope_api_key
-        )
-        self.vector_store = PGVector(
-            embeddings=self.embeddings,
-            connection=settings.postgres_rag_connection_string,
-            collection_name=settings.vector_store_collection,
-        )
+        self.vector_store = PGVectorMemory.get_vectore_store()
         
         # 初始化所有 chunker
         self.chunkers: List[Chunker] = [
@@ -143,7 +134,7 @@ class MinioEventListener:
             
             # 存储到向量数据库
             self.logger.info(f"开始向量化并存储到数据库")
-            self.vector_store.add_documents(documents)
+            self.vector_store.add_documents(documents=documents)
             self.logger.info(f"文档处理完成: {object_name}, 共 {len(documents)} 个文档块")
             
         except Exception as e:

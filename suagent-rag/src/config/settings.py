@@ -16,19 +16,8 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, description="调试模式")
     log_level: str = Field(default="INFO", description="日志级别")
 
-    # ===== API 服务配置 =====
-    api_host: str = Field(default="0.0.0.0", description="API 服务主机")
-    api_port: int = Field(default=8000, description="API 服务端口")
-
-    # ===== LLM 配置 - OpenAI =====
-    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API Key")
-    openai_api_base: Optional[str] = Field(default=None, description="OpenAI API Base URL")
-    openai_model: str = Field(default="qwen3-max", description="OpenAI 模型名称")
-    openai_temperature: float = Field(default=0.7, description="温度参数")
-
     # ===== LLM 配置 - 阿里云通义千问 =====
     dashscope_api_key: Optional[str] = Field(default=None, description="DashScope API Key")
-    dashscope_model: str = Field(default="qwen-max", description="通义千问模型名称")
 
     # ===== PostgreSQL / PGVector 配置 =====
     postgres_host: str = Field(default="localhost", description="PostgreSQL 主机")
@@ -77,10 +66,6 @@ class Settings(BaseSettings):
     embedding_model: str = Field(default="text-embedding-v4", description="嵌入模型")
     vector_store_collection: str = Field(default="suagent_documents", description="向量库集合名称")
 
-    # ===== 搜索工具配置 =====
-    enable_web_search: bool = Field(default=True, description="启用网页搜索")
-    max_search_results: int = Field(default=5, description="最大搜索结果数")
-    
     # ===== MinIO 配置 =====
     minio_endpoint: str = Field(default="localhost:9000", description="MinIO 主机")
     minio_access_key: Optional[str] = Field(default=None, description="MinIO 访问密钥")
