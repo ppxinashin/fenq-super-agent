@@ -55,7 +55,11 @@ class OfficeChunker(Chunker):
     
     def chunk(self, data: bytes) -> list[str]:
         """将Office文档内容分块"""
-        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            separators=["\n\n", "\n", "。", "！", "？", ".", "!", "?", "；", ";", "，", ",", " ", ""]
+        )
         return splitter.split_text(self._parse(data))
 
 

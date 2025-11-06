@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     minio_access_key: Optional[str] = Field(default=None, description="MinIO 访问密钥")
     minio_secret_key: Optional[str] = Field(default=None, description="MinIO 秘密密钥")
     minio_bucket: str = Field(default="suagent", description="MinIO 桶名称")
+    
+    # ===== MinerU 配置 =====
+    mineru_api_token: Optional[str] = Field(default=None, description="MinerU API Token")
+    open_ocr: int = Field(default=0, description="是否开启OCR API")
 
     class Config:
         env_file = ".env"
