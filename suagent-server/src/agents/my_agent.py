@@ -89,14 +89,14 @@ class MyAgent:
             middleware=self.middlewares
         )
     
-    def invoke(self, input):
-        return self._agent.invoke(input, {"configurable": {"thread_id": self.chatId}})
+    def invoke(self, input, cfg:dict[str, Any] | None = None):
+        return self._agent.invoke(input, {"configurable": {"thread_id": self.chatId, **(cfg or {})}})
     
-    def stream(self, input):
-        return self._agent.stream(input, {"configurable": {"thread_id": self.chatId}})
+    def stream(self, input, cfg:dict[str, Any] | None = None):
+        return self._agent.stream(input, {"configurable": {"thread_id": self.chatId, **(cfg or {})}})
     
-    def ainvoke(self, input):
-        return self._agent.ainvoke(input, {"configurable": {"thread_id": self.chatId}})
+    def ainvoke(self, input, cfg:dict[str, Any] | None = None):
+        return self._agent.ainvoke(input, {"configurable": {"thread_id": self.chatId, **(cfg or {})}})
     
-    def astream(self, input):
-        return self._agent.astream(input, {"configurable": {"thread_id": self.chatId}})
+    def astream(self, input, cfg:dict[str, Any] | None = None):
+        return self._agent.astream(input, {"configurable": {"thread_id": self.chatId, **(cfg or {})}})

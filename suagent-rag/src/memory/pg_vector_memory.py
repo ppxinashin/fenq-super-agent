@@ -1,5 +1,6 @@
 from langchain_core.documents import Document
 import psycopg
+from sqlalchemy.exc import ProgrammingError
 from langchain_postgres import PGEngine, PGVectorStore
 from langchain_community.embeddings import DashScopeEmbeddings
 from src.config import settings
@@ -20,12 +21,16 @@ class PGVectorMemory:
                 table_name=settings.vector_store_collection,
                 vector_size=1024
             )
-            cls._vector_store: PGVectorStore = PGVectorStore.create_sync(
-                engine=cls._engine,
-                table_name=settings.vector_store_collection,
-                embedding_service=cls._embedding_service
-            )
-        except psycopg.errors.DuplicateTable as e:
-            pass
+        except ProgrammingError as e:
+            # 表已存在，跳过创建
+            if "already exists" not in str(e):
+                raise
+        
+        # 无论表是否已存在，都创建 vector store 实例
+        cls._vector_store: PGVectorStore = PGVectorStore.create_sync(
+            engine=cls._engine,
+            table_name=settings.vector_store_collection,
+            embedding_service=cls._embedding_service
+        )
             
         return cls._vector_store
