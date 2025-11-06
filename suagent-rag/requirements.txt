@@ -1,6 +1,4 @@
 # ===== Core runtime (Python >= 3.10 per LangChain/LangGraph v1) =====
-fastapi==0.120.3           # Pydantic v2 原生支持，最新稳定版 :contentReference[oaicite:1]{index=1}
-uvicorn[standard]==0.38.0  # 支持 Python 3.14 的最新版 ASGI 服务器 :contentReference[oaicite:2]{index=2}
 pydantic==2.12.3           # FastAPI v0.12x 线适配的 v2 系列最新版 :contentReference[oaicite:3]{index=3}
 pydantic-settings==2.10.1   # Pydantic 设置管理
 
@@ -18,10 +16,6 @@ langchain-community==0.4   # 社区模型
 langchain-postgres==0.0.16                     # 官方 Postgres/PGVector 集成包（2025-10-17） :contentReference[oaicite:13]{index=13}
 langgraph-checkpoint-postgres==3.0.0           # LangChain Postgres 短期记忆
 psycopg[binary]==3.2.12                        # PostgreSQL 驱动（3.x；二进制加速） :contentReference[oaicite:14]{index=14}
-
-# ===== RAG / Tools / Crawling =====
-beautifulsoup4==4.14.2     # 网页解析 :contentReference[oaicite:15]{index=15}
-playwright==1.48.0         # 无头浏览器自动化（安装后需 `playwright install`） :contentReference[oaicite:16]{index=16}
 
 # ===== PDF / 文档处理 =====
 minio==7.2.16                                              # MinIO 对象存储
