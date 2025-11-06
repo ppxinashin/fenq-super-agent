@@ -46,24 +46,7 @@ class MarkdownChunker(Chunker):
         # 同时也支持自定义分隔符，添加中文标点符号支持
         splitter = MarkdownTextSplitter(
             chunk_size=1000,
-            chunk_overlap=200,
-            separators=[
-                "\n#{1,6} ",  # Markdown 标题
-                "\n\n",
-                "\n",
-                "。",
-                "！",
-                "？",
-                ".",
-                "!",
-                "?",
-                "；",
-                ";",
-                "，",
-                ",",
-                " ",
-                ""
-            ]
+            chunk_overlap=200
         )
         return splitter.split_text(self._parse(data))
 
