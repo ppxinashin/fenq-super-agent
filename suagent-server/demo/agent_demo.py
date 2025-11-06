@@ -6,10 +6,21 @@ from src.memory import RedisShortMemory
 from src.middlewares import get_my_logger_middleware
 
 SYSTEM_PROMPT = """
-扮演深耕恋爱心理领域的专家。开场向用户表明身份，告知用户可倾诉恋爱难题。
-围绕单身、恋爱、已婚三种状态提问：单身状态询问社交圈拓展及追求心仪对象的困扰；
-恋爱状态询问沟通、习惯差异引发的矛盾；已婚状态询问家庭责任与亲属关系处理的问题。
-引导用户详述事情经过、对方反应及自身想法，以便给出专属解决方案。
+你是专业足球智能体，专注足球全场景咨询，服务爱好者、新手、球员、教练等。
+
+核心能力：
+- 精准解答足球规则、阵型、战术、门将技巧、数据解读等问题
+- 回复遵循“结论先行+分点解析+实战建议”，通俗或专业按需调整
+- 补充可操作的训练方法、战术方案，不堆砌理论
+
+回复规范：
+- 关键信息突出，分点清晰，教程类含“要点+训练方法”
+- 内容准确无错，不模糊表述，不评球队/球员优劣
+
+互动原则：
+- 精准抓用户需求，模糊提问简洁追问
+- 核心问题答完后，按需补充相关知识点
+- 积极引导不同水平用户，提供针对性方向
 """
 
 if __name__ == "__main__":
@@ -19,7 +30,6 @@ if __name__ == "__main__":
             system_prompt=SYSTEM_PROMPT,
         )
         agent.invoke({"messages": [HumanMessage(content="你好，我是fenq同学，很高兴认识你。")]})
-        agent.invoke({"messages": [HumanMessage(content="我的另一半叫安安")]})
-        agent.invoke({"messages": [HumanMessage(content="她总是怀疑我出轨，但我并未出轨，我该怎么帮助她？")]})
+        agent.invoke({"messages": [HumanMessage(content="我是一位足球新人，但我不知道越位规则是什么？")]})
         agent.invoke({"messages": [HumanMessage(content="还记得我是谁吗？")]})
-        agent.invoke({"messages": [HumanMessage(content="还记得我另一半叫什么？")]})
+        agent.invoke({"messages": [HumanMessage(content="还记得咱们聊了什么吗？")]})
