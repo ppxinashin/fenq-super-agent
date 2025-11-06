@@ -33,24 +33,7 @@ echo "===========================================" >> "${LOG_FILE}"
 
 # 尝试优雅地停止进程 (SIGTERM)
 echo "正在停止服务 (PID: ${PID})..."
-kill "${PID}"
-
-# 等待进程结束 (最多10秒)
-COUNTER=0
-while ps -p "${PID}" > /dev/null 2>&1 && [ ${COUNTER} -lt 10 ]; do
-    sleep 1
-    COUNTER=$((COUNTER + 1))
-    echo -n "."
-done
-echo ""
-
-# 如果进程还在运行，强制终止
-if ps -p "${PID}" > /dev/null 2>&1; then
-    echo "进程未响应，强制终止..."
-    kill -9 "${PID}"
-    sleep 1
-fi
-
+kill -9 "${PID}"
 # 确认进程已停止
 if ps -p "${PID}" > /dev/null 2>&1; then
     echo "✗ 无法停止服务"

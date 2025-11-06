@@ -42,8 +42,6 @@ class MarkdownChunker(Chunker):
     
     def chunk(self, data: bytes) -> list[str]:
         """将Markdown文档内容分块"""
-        # MarkdownTextSplitter 会根据 Markdown 标题层级进行分割
-        # 同时也支持自定义分隔符，添加中文标点符号支持
         splitter = MarkdownTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
