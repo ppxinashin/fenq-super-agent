@@ -6,6 +6,6 @@ from .pdf import PDFChunker
 from .markdown import MarkdownChunker
 from .office import OfficeChunker
 from .json import JSONChunker
-
-__all__ = ["Chunker", "PDFChunker", "MarkdownChunker", "OfficeChunker", "JSONChunker"]
+from .puretext import PureTextChunker
+__all__ = ["Chunker", "PDFChunker", "MarkdownChunker", "OfficeChunker", "JSONChunker", "PureTextChunker"]
 

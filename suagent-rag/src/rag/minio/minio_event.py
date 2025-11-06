@@ -17,6 +17,7 @@ from src.rag.chunker import (
     MarkdownChunker,
     OfficeChunker,
     JSONChunker,
+    PureTextChunker,
 )
 from src.utils import get_logger
 
@@ -36,6 +37,7 @@ class MinioEventListener:
             MarkdownChunker(),
             OfficeChunker(),
             JSONChunker(),
+            PureTextChunker(),
         ]
     
     def get_file_extension(self, filename: str) -> str:
@@ -160,11 +162,8 @@ class MinioEventListener:
             
             self.logger.info("事件监听已启动，等待事件触发...")
             
-            for event in events:
+            for event_data in events:
                 try:
-                    # 解析事件数据
-                    event_data = json.loads(event)
-                    
                     # 处理每个记录
                     for record in event_data.get('Records', []):
                         event_name = record.get('eventName', '')
