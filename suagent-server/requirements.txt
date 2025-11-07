@@ -8,6 +8,7 @@ pydantic-settings==2.10.1   # Pydantic 设置管理
 langchain==1.0.3           # LangChain v1 稳定版（2025-10-29） :contentReference[oaicite:4]{index=4}
 langgraph==1.0.2           # LangGraph v1 稳定版（2025-10-29） :contentReference[oaicite:5]{index=5}
 langgraph-prebuilt==1.0.2  # 可选：LangGraph 高阶预置组件 :contentReference[oaicite:6]{index=6}
+langsmith==0.4.40          # LangSmith监听
 
 # ===== Model provider integrations（与 LangChain 解耦的官方整合包）=====
 langchain-openai==1.0.1    # LangChain x OpenAI 集成包（2025-10-21） :contentReference[oaicite:9]{index=9}

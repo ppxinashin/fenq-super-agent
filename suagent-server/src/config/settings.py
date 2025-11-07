@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     openai_api_base: Optional[str] = Field(default=None, description="OpenAI API Base URL")
     openai_model: str = Field(default="qwen3-max", description="OpenAI 模型名称")
     openai_temperature: float = Field(default=0.7, description="温度参数")
+    
+    # ===== LangSmith 跟踪 =====
+    langsmith_tracing: Optional[bool] = Field(default=False, description="是否启用 LangSmith 跟踪")
+    langsmith_api_key: Optional[str] = Field(default=None, description="LangSmith API Key")
+    langsmith_workspace_id: Optional[str] = Field(default=None, description="LangSmith Workspace ID")
 
     # ===== LLM 配置 - 阿里云通义千问 =====
     dashscope_api_key: Optional[str] = Field(default=None, description="DashScope API Key")
