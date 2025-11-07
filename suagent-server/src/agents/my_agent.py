@@ -5,13 +5,14 @@ Agent 构建类 - 用于构建 Agent
 from dataclasses import dataclass
 import uuid
 from langchain.agents import AgentState, create_agent
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, cast
 from langchain.agents.factory import ResponseT
 from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.base import BaseStore
 from langgraph.types import Checkpointer
@@ -28,10 +29,11 @@ class MyAgent:
         llm: Optional[BaseChatModel] = None,
         tools: Optional[List[BaseTool]] = None,
         system_prompt: Optional[str] = None,
-        middlewares: Optional[List[AgentMiddleware]] = None,
+        middlewares: Optional[List[AgentMiddleware[Any, Any]]] = None,
         checkpointer: Optional[Checkpointer] = None,
         store: Optional[BaseStore] = None,
         chatId: Optional[str] = None,
+        recursion_limit: Optional[int] = None,
     ):
         """
         初始化 My Agent Builder
@@ -62,6 +64,8 @@ class MyAgent:
         self.store = store or None
         # 初始化聊天 ID
         self.chatId = chatId or str(uuid.uuid4())
+        # 初始化递归限制
+        self.recursion_limit = recursion_limit or 100
         # 初始化 Agent
         self._agent = self._build()
 
@@ -90,13 +94,41 @@ class MyAgent:
         )
     
     def invoke(self, input, cfg:dict[str, Any] | None = None):
-        return self._agent.invoke(input, {"configurable": {"thread_id": self.chatId, **(cfg or {})}})
+        config = self._build_config(cfg)
+        return self._agent.invoke(input, config)
     
     def stream(self, input, cfg:dict[str, Any] | None = None):
-        return self._agent.stream(input, {"configurable": {"thread_id": self.chatId, **(cfg or {})}})
+        config = self._build_config(cfg)
+        return self._agent.stream(input, config)
     
     def ainvoke(self, input, cfg:dict[str, Any] | None = None):
-        return self._agent.ainvoke(input, {"configurable": {"thread_id": self.chatId, **(cfg or {})}})
+        config = self._build_config(cfg)
+        return self._agent.ainvoke(input, config)
     
     def astream(self, input, cfg:dict[str, Any] | None = None):
-        return self._agent.astream(input, {"configurable": {"thread_id": self.chatId, **(cfg or {})}})
+        config = self._build_config(cfg)
+        return self._agent.astream(input, config)
+    
+    def _build_config(self, cfg: dict[str, Any] | None = None) -> RunnableConfig:
+        """构建配置字典
+        
+        Args:
+            cfg: 额外的配置参数，可以包含 recursion_limit, configurable 等
+            
+        Returns:
+            完整的配置字典
+        """
+        # 基础配置，包含 thread_id
+        config = {"configurable": {"thread_id": self.chatId}, "recursion_limit": self.recursion_limit}
+        
+        if cfg:
+            # 合并 configurable 中的配置
+            if "configurable" in cfg:
+                config["configurable"].update(cfg["configurable"])
+            
+            # 添加其他根级别的配置（如 recursion_limit）
+            for key, value in cfg.items():
+                if key != "configurable":
+                    config[key] = value
+        
+        return cast(RunnableConfig, config)

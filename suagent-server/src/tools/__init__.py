@@ -9,6 +9,7 @@ from .file_opt import create_read_file_tool, create_write_file_tool
 from .terminal_opt import create_execute_command_tool
 from .web_search import create_web_search_tool
 from .downloader import create_downloader_tool
+from .now_time import create_now_time_tool
 
 def all_tools():
     return [
@@ -19,7 +20,8 @@ def all_tools():
         create_write_file_tool(),
         create_execute_command_tool(),
         create_web_search_tool(),
-        create_downloader_tool()
+        create_downloader_tool(),
+        create_now_time_tool()
     ]
 
 __all__ = [
@@ -31,6 +33,7 @@ __all__ = [
     "create_execute_command_tool",
     "create_web_search_tool",
     "create_downloader_tool",
+    "create_now_time_tool",
     "all_tools",
 ]
 
