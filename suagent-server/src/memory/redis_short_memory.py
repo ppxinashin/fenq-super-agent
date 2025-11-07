@@ -14,7 +14,7 @@ class RedisShortMemory:
     """
     @classmethod
     def _checkpointer(cls):
-        with RedisSaver.from_conn_string(settings.redis_url) as checkpointer:
+        with RedisSaver.from_conn_string(settings.redis_url, ttl={"default_ttl": 1440}) as checkpointer:
             checkpointer.setup()
             yield checkpointer
             
