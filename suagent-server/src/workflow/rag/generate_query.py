@@ -2,13 +2,20 @@ from .llm_rag import _response_model
 from langchain_core.tools import create_retriever_tool
 from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolNode
+from langchain_community.retrievers import BM25Retriever
+from langchain_classic.retrievers import EnsembleRetriever
 
 from src.memory import PGVectorMemory
 from src.utils import get_logger
 
 logger = get_logger(__name__)
 vector_store = PGVectorMemory.get_vectore_store()
-retriever = vector_store.as_retriever()
+vector_retriever = vector_store.as_retriever(search_kwargs={"k": 5})
+bm25_retriever = BM25Retriever.from_documents(PGVectorMemory.get_all_documents())
+retriever = EnsembleRetriever(
+    retrievers=[vector_retriever, bm25_retriever],
+    weights=[0.7, 0.3]
+)
 
 TOOL_PROMPT = "请根据要求从知识库中检索出相关文档，并返回相关的信息"
 

@@ -39,4 +39,4 @@ if __name__ == "__main__":
             tools=[rag_tool],
         )
     
-    agent.invoke({"messages": [HumanMessage(content="我是一位足球新人，请帮我介绍一下3-2-5阵型")]})
+    agent.invoke({"messages": [HumanMessage(content="我是一位足球新人，请帮我介绍一下3-5-2阵型")]})
