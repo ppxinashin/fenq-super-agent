@@ -36,3 +36,4 @@ loguru==0.7.3                     # 便捷日志库 :contentReference[oaicite:21
 python-dotenv==1.2.1              # 读取 .env 配置 :contentReference[oaicite:22]{index=22}
 requests==2.32.5                  # 通用 HTTP 客户端（LangChain 外独立调用 MCP/REST）
 langmem==0.0.3                    # LangChain 长期记忆
+ddgs==9.0.0                       # 搜索引擎

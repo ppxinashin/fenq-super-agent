@@ -1,7 +1,5 @@
-from traceback import print_tb
 from langchain_core.messages import HumanMessage
 from src.agents import MyAgent
-from src.config import settings
 from src.memory import RedisShortMemory
 from src.middlewares import get_my_logger_middleware
 

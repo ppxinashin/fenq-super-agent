@@ -21,7 +21,8 @@ class MyLoggerMiddleware(AgentMiddleware[AgentState]):
     def wrap_tool_call(self, request, handler) -> ToolMessage | Command:
         result = handler(request)
         tool_name = request.tool.get_name() if request.tool else "Unknown"
-        self._logger.info(f"AI Call Tool: {tool_name}")
+        tool_args = request.tool.args if request.tool else {}
+        self._logger.info(f"AI Call Tool: {tool_name}, Args: {tool_args}")
         return result
     
     def after_model(self, state: AgentState, runtime) -> dict[str, Any] | None:
