@@ -7,14 +7,15 @@ from langgraph.checkpoint.redis import RedisSaver
 from src.config import settings
 
 
-@dataclass
-class RedisShortMemory:
+class RedisShortMemory:    
     """
     Redis 短期记忆
     """
+    ttl: int = 1440
+    
     @classmethod
     def _checkpointer(cls):
-        with RedisSaver.from_conn_string(settings.redis_url, ttl={"default_ttl": 1440}) as checkpointer:
+        with RedisSaver.from_conn_string(settings.redis_url, ttl={"default_ttl": cls.ttl}) as checkpointer:
             checkpointer.setup()
             yield checkpointer
             

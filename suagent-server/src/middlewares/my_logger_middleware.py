@@ -25,6 +25,13 @@ class MyLoggerMiddleware(AgentMiddleware[AgentState]):
         self._logger.info(f"AI Call Tool Name: {tool_name}, Args: {tool_call.get('args', {})}")
         return result
     
+    async def awrap_tool_call(self, request, handler) -> ToolMessage | Command:
+        result = await handler(request)
+        tool_name = request.tool.get_name() if request.tool else "Unknown"
+        tool_call = request.tool_call if request.tool_call else {}
+        self._logger.info(f"AI Call Tool Name: {tool_name}, Args: {tool_call.get('args', {})}")
+        return result
+    
     def after_model(self, state: AgentState, runtime) -> dict[str, Any] | None:
         msg = state.get("messages", [])[-1].content
         self._logger.info(f"AI Response: {msg}")
