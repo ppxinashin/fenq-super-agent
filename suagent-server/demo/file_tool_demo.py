@@ -15,6 +15,6 @@ if __name__ == "__main__":
         tools=[read_file_tool, write_file_tool],
     )
     agent.invoke({"messages": [HumanMessage(content=(
-        "帮我写一个类似chrome的小恐龙的那种游戏，单网页HTML代码，文件名自己取，html格式，把你的代码写到文件里去，写完的话告诉我写完了就行"
+        "帮我写一个点球大战小游戏，单网页HTML代码，文件名自己取，html格式，把你的代码写到文件里去，写完的话告诉我写完了就行"
     ))]})
     agent.invoke({"messages": [HumanMessage(content="请帮我读取你刚刚写的代码，并告诉我代码的结构和实现原理")]})
