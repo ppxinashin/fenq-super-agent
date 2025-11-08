@@ -14,7 +14,7 @@ async def main():
         middlewares=[get_my_logger_middleware()],
         tools=tools,
     )
-    await agent.ainvoke({"messages": [HumanMessage(content="帮我查询一下从黄龙体育场到西湖的路线")]})
+    await agent.ainvoke({"messages": [HumanMessage(content="推荐一些精彩的足球集锦")]})
     
 if __name__ == "__main__":
     asyncio.run(main())

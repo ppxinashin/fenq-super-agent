@@ -1,0 +1,19 @@
+# ===== Core runtime =====
+pydantic==2.12.3
+pydantic-settings==2.10.1
+
+# MCP + SSE 服务器支持
+mcp==1.21.0
+
+# ===== YouTube API =====
+google-api-python-client==2.146.0
+google-auth==2.34.0
+google-auth-httplib2==0.2.0
+httplib2==0.22.0
+
+# ===== ISO 8601 时长解析 =====
+isodate==0.6.1
+
+# ===== SSE Web Server =====
+uvicorn==0.31.1
+sse-starlette==1.6.1

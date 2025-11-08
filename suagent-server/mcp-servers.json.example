@@ -6,7 +6,7 @@
       },
       "amap-maps": {
         "type": "sse",
-        "url": "https://mcp.api-inference.modelscope.net/afbe1094621a49/sse"
+        "url": "https://mcp.api-inference.modelscope.net/xxxx/sse"
       }
     }
 }
