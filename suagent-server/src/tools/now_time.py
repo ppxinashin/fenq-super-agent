@@ -8,7 +8,7 @@ from langchain_core.tools import tool
 @tool
 def get_current_time() -> str:
     """
-    获取当前时间
+    获取当前时间，如果想查今天几号，就使用这个工具
     
     返回格式化的当前时间字符串，格式为: YYYY-MM-dd HH:mm:ss
     

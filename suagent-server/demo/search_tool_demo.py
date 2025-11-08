@@ -36,17 +36,13 @@ if __name__ == "__main__":
             get_my_logger_middleware(), 
             ToolCallLimitMiddleware(run_limit=10, exit_behavior="end")
         ],
-        tools=[search_tool, scrape_tool, now_time_tool],
+        tools=[now_time_tool, search_tool, scrape_tool],
         system_prompt=IMPROVED_SYSTEM_PROMPT,  # 使用改进的系统提示词
     )
     
     # ToolCallLimitMiddleware 的 run_limit=5 会限制工具调用次数：
     # - 当工具调用次数达到指定次数时，会跳到 end 节点并返回提示信息
     # - exit_behavior="end" 表示超过限制时优雅地结束，而不是抛出错误
-    result = agent.invoke(
-        {"messages": [HumanMessage(content=(
-            "获取一下截至当前时间的中超积分榜，必要的话需要做网页抓取"
-        ))]}
-    )
+    agent.invoke({"messages": [HumanMessage(content="今天是几号？")]})
+    agent.invoke({"messages": [HumanMessage(content="获取一下截至今天的中超积分榜，必要的话需要做网页抓取")]})
     
-

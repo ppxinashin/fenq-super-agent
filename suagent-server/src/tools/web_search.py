@@ -1,7 +1,7 @@
 from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_community.utilities.duckduckgo_search import DuckDuckGoSearchAPIWrapper
 
-wrapper = DuckDuckGoSearchAPIWrapper(region="cn-zh", time="d")
+wrapper = DuckDuckGoSearchAPIWrapper(region="cn-zh")
 search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list")
 
 def create_web_search_tool():
