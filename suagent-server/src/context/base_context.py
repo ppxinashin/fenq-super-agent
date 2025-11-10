@@ -3,8 +3,10 @@
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 @dataclass
 class BaseContext:
-    user_id: str
-    chat_id: str
+    user_id: Optional[str] = None
+    chat_id: Optional[str] = None
+    agent_id: Optional[str] = None

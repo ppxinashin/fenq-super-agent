@@ -37,6 +37,8 @@ if __name__ == "__main__":
             middlewares=[get_my_logger_middleware()],
             system_prompt=SYSTEM_PROMPT,
             tools=[rag_tool],
+            user_id="admin",
+            agent_id="football",
         )
     
     agent.invoke({"messages": [HumanMessage(content="我是一位足球新人，请帮我介绍一下3-5-2阵型")]})

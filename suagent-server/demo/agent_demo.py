@@ -1,12 +1,9 @@
 from langchain_core.messages import HumanMessage
 from src.agents import MyAgent
-from src.memory import PGLongMemory, RedisShortMemory
+from src.memory import RedisShortMemory
 from src.middlewares import get_my_logger_middleware
-from src.tools import create_memory_4ever_tool
 
-memory_4ever_tool = create_memory_4ever_tool()
 logger_middleware = get_my_logger_middleware()
-
 
 SYSTEM_PROMPT = """
 你是专业足球智能体，专注足球全场景咨询，服务爱好者、新手、球员、教练等。
@@ -27,15 +24,14 @@ SYSTEM_PROMPT = """
 """
 
 if __name__ == "__main__":
-        agent = MyAgent(
-            checkpointer=RedisShortMemory.get_checkpointer(),
-            store=PGLongMemory.get_store(),
-            user_id="jehol_fenq",
-            middlewares=[logger_middleware],
-            # tools=[memory_4ever_tool],
-            system_prompt=SYSTEM_PROMPT,
-        )
-        agent.invoke({"messages": [HumanMessage(content="你好，我是fenq同学，我是一位足球新人，平时喜欢看球，但很多规则不知道，不过很高兴认识你。")]})
-        agent.invoke({"messages": [HumanMessage(content="我不知道越位规则是什么，能帮我解释一下吗？")]})
-        agent.invoke({"messages": [HumanMessage(content="还记得我是谁吗？")]})
-        agent.invoke({"messages": [HumanMessage(content="把本次对话总结一下吧")]})
+    agent = MyAgent(
+        checkpointer=RedisShortMemory.get_checkpointer(),
+        user_id="admin",
+        agent_id="football",
+        middlewares=[logger_middleware],
+        system_prompt=SYSTEM_PROMPT,
+    )
+    agent.invoke({"messages": [HumanMessage(content="你好，我是fenq同学，我是一位足球新人，平时喜欢看球，但很多规则不知道，不过很高兴认识你。")]})
+    agent.invoke({"messages": [HumanMessage(content="我不知道越位规则是什么，能帮我解释一下吗？")]})
+    agent.invoke({"messages": [HumanMessage(content="还记得我是谁吗？")]})
+    agent.invoke({"messages": [HumanMessage(content="把本次对话总结一下吧")]})

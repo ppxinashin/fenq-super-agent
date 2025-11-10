@@ -3,8 +3,7 @@
 """
 
 from .redis_short_memory import RedisShortMemory
-from .pg_long_memory import PGLongMemory
 from .pg_vector_memory import PGVectorMemory
 
-__all__ = ["RedisShortMemory", "PGLongMemory", "PGVectorMemory"]
+__all__ = ["RedisShortMemory", "PGVectorMemory"]
 

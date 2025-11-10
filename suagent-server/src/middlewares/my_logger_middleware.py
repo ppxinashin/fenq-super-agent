@@ -1,11 +1,13 @@
 from langchain.agents.middleware import AgentState, AgentMiddleware
-from typing import Any
+from typing import Any, Callable
 
 from langchain_core.messages import ToolMessage
+from langgraph.runtime import Runtime
 from langgraph.types import Command
 from src.utils import get_logger
+from src.context import BaseContext
 
-class MyLoggerMiddleware(AgentMiddleware[AgentState]):
+class MyLoggerMiddleware(AgentMiddleware[AgentState, BaseContext]):
     @property
     def name(self) -> str:
         return self.__class__.__name__
@@ -13,9 +15,9 @@ class MyLoggerMiddleware(AgentMiddleware[AgentState]):
     def __init__(self):
         self._logger = get_logger(self.name)
         
-    def before_model(self, state: AgentState, runtime) -> dict[str, Any] | None:
+    def before_model(self, state: AgentState, runtime: Runtime[BaseContext]) -> dict[str, Any] | None:
         msg = state.get("messages", [])[-1].content
-        self._logger.info(f"AI Request: {msg}")
+        self._logger.info(f"AI Request: {msg}, User ID: {runtime.context.user_id}, Agent ID: {runtime.context.agent_id}")
         return None
     
     def wrap_tool_call(self, request, handler) -> ToolMessage | Command:
@@ -32,7 +34,7 @@ class MyLoggerMiddleware(AgentMiddleware[AgentState]):
         self._logger.info(f"AI Call Tool Name: {tool_name}, Args: {tool_call.get('args', {})}")
         return result
     
-    def after_model(self, state: AgentState, runtime) -> dict[str, Any] | None:
+    def after_model(self, state: AgentState, runtime: Runtime[BaseContext]) -> dict[str, Any] | None:
         msg = state.get("messages", [])[-1].content
         self._logger.info(f"AI Response: {msg}")
         return None

@@ -18,6 +18,7 @@ from langgraph.store.base import BaseStore
 from langgraph.types import Checkpointer
 
 from src.config import settings
+from src.context import BaseContext
 from src.utils import get_logger
 
 logger = get_logger(__name__)
@@ -35,7 +36,9 @@ class MyAgent:
         store: Optional[BaseStore] = None,
         chat_id: Optional[str] = None,
         user_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
         recursion_limit: Optional[int] = None,
+        context: Optional[BaseContext] = None,
     ):
         """
         初始化 My Agent Builder
@@ -44,6 +47,14 @@ class MyAgent:
             llm: 语言模型（可选）
             tools: 工具列表（可选）
             system_prompt: 系统提示词（可选）
+            middlewares: 中间件列表（可选）
+            checkpointer: 短期记忆检查点（可选）
+            store: 长期记忆存储（可选）
+            chat_id: 聊天 ID（可选）
+            user_id: 用户 ID（可选）
+            agent_id: 智能体 ID（可选）
+            recursion_limit: 递归限制（可选）
+            context: 上下文（可选）
         """
         # 初始化语言模型
         if llm is None:
@@ -68,10 +79,14 @@ class MyAgent:
         self.chat_id = chat_id or str(uuid.uuid4())
         # 初始化用户 ID
         self.user_id = user_id or None
+        # 初始化智能体 ID
+        self.agent_id = agent_id or None
         # 初始化递归限制
         self.recursion_limit = recursion_limit or 100
         # 初始化 Agent
         self._agent = self._build()
+        # 初始化上下文
+        self.context = context or BaseContext(user_id=self.user_id, chat_id=self.chat_id, agent_id=self.agent_id)
 
     def _default_system_prompt(self) -> str:
         """默认系统提示词"""
@@ -99,19 +114,19 @@ class MyAgent:
     
     def invoke(self, input, cfg:dict[str, Any] | None = None):
         config = self._build_config(cfg)
-        return self._agent.invoke(input, config)
+        return self._agent.invoke(input, config, context=self.context)
     
     def stream(self, input, cfg:dict[str, Any] | None = None):
         config = self._build_config(cfg)
-        return self._agent.stream(input, config)
+        return self._agent.stream(input, config, context=self.context)
     
     def ainvoke(self, input, cfg:dict[str, Any] | None = None):
         config = self._build_config(cfg)
-        return self._agent.ainvoke(input, config)
+        return self._agent.ainvoke(input, config, context=self.context)
     
     def astream(self, input, cfg:dict[str, Any] | None = None):
         config = self._build_config(cfg)
-        return self._agent.astream(input, config)
+        return self._agent.astream(input, config, context=self.context)
     
     def _build_config(self, cfg: dict[str, Any] | None = None) -> RunnableConfig:
         """构建配置字典
@@ -126,6 +141,8 @@ class MyAgent:
         config = {"configurable": {"thread_id": self.chat_id}, "recursion_limit": self.recursion_limit}
         if self.user_id:
             config["configurable"]["user_id"] = self.user_id
+        if self.agent_id:
+            config["configurable"]["agent_id"] = self.agent_id
         if cfg:
             # 合并 configurable 中的配置
             if "configurable" in cfg:

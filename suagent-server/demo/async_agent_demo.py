@@ -26,6 +26,8 @@ async def main():
     agent = MyAgent(
         checkpointer=await RedisShortMemory.get_acheckpointer(),
         middlewares=[get_my_logger_middleware()],
+        user_id="admin",
+        agent_id="football",
         system_prompt=SYSTEM_PROMPT,
     )
     await agent.ainvoke({"messages": [HumanMessage(content="你好，我是fenq同学，很高兴认识你。")]})
