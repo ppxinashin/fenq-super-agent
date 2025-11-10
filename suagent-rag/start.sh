@@ -81,8 +81,6 @@ if ps -p "${PROCESS_PID}" > /dev/null 2>&1; then
     echo ""
     echo "使用以下命令:"
     echo "  - 查看日志: tail -f ${LOG_FILE}"
-    echo "  - 停止服务: ./stop.sh"
-    echo "  - 查看状态: ./status.sh"
 else
     echo "✗ 服务启动失败，请查看日志文件: ${LOG_FILE}"
     rm -f "${PID_FILE}"
