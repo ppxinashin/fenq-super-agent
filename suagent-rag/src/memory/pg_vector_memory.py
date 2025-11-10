@@ -13,12 +13,15 @@ class PGVectorMemory:
         model=settings.embedding_model,
         dashscope_api_key=settings.dashscope_api_key
     )
+    @classmethod
+    def _get_vectore_store_table_name(cls, agent_id: str, user_id: str) -> str:
+        return f"{settings.vector_store_collection}_{agent_id}_{user_id}"
     
     @classmethod
-    def get_vectore_store(cls) -> PGVectorStore:
+    def get_vectore_store(cls, agent_id: str, user_id: str) -> PGVectorStore:
         try:
             cls._engine.init_vectorstore_table(
-                table_name=settings.vector_store_collection,
+                table_name=cls._get_vectore_store_table_name(agent_id, user_id),
                 vector_size=1024
             )
         except ProgrammingError as e:
@@ -29,7 +32,7 @@ class PGVectorMemory:
         # 无论表是否已存在，都创建 vector store 实例
         cls._vector_store: PGVectorStore = PGVectorStore.create_sync(
             engine=cls._engine,
-            table_name=settings.vector_store_collection,
+            table_name=cls._get_vectore_store_table_name(agent_id, user_id),
             embedding_service=cls._embedding_service
         )
             
