@@ -10,6 +10,7 @@ from .terminal_opt import create_execute_command_tool
 from .web_search import create_web_search_tool
 from .downloader import create_downloader_tool
 from .now_time import create_now_time_tool
+from .memory_4ever import create_memory_4ever_tool, create_amemory_4ever_tool
 
 def all_tools():
     return [
@@ -21,7 +22,9 @@ def all_tools():
         create_execute_command_tool(),
         create_web_search_tool(),
         create_downloader_tool(),
-        create_now_time_tool()
+        create_now_time_tool(),
+        create_memory_4ever_tool(),
+        create_amemory_4ever_tool(),
     ]
 
 __all__ = [
@@ -34,6 +37,8 @@ __all__ = [
     "create_web_search_tool",
     "create_downloader_tool",
     "create_now_time_tool",
+    "create_memory_4ever_tool",
+    "create_amemory_4ever_tool",
     "all_tools",
 ]
 

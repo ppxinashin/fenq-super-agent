@@ -18,8 +18,9 @@ from langgraph.store.base import BaseStore
 from langgraph.types import Checkpointer
 
 from src.config import settings
+from src.utils import get_logger
 
-
+logger = get_logger(__name__)
 
 class MyAgent:
     """Agent 类"""
@@ -32,7 +33,8 @@ class MyAgent:
         middlewares: Optional[List[AgentMiddleware[Any, Any]]] = None,
         checkpointer: Optional[Checkpointer] = None,
         store: Optional[BaseStore] = None,
-        chatId: Optional[str] = None,
+        chat_id: Optional[str] = None,
+        user_id: Optional[str] = None,
         recursion_limit: Optional[int] = None,
     ):
         """
@@ -63,7 +65,9 @@ class MyAgent:
         # 初始化长期记忆
         self.store = store or None
         # 初始化聊天 ID
-        self.chatId = chatId or str(uuid.uuid4())
+        self.chat_id = chat_id or str(uuid.uuid4())
+        # 初始化用户 ID
+        self.user_id = user_id or None
         # 初始化递归限制
         self.recursion_limit = recursion_limit or 100
         # 初始化 Agent
@@ -119,8 +123,9 @@ class MyAgent:
             完整的配置字典
         """
         # 基础配置，包含 thread_id
-        config = {"configurable": {"thread_id": self.chatId}, "recursion_limit": self.recursion_limit}
-        
+        config = {"configurable": {"thread_id": self.chat_id}, "recursion_limit": self.recursion_limit}
+        if self.user_id:
+            config["configurable"]["user_id"] = self.user_id
         if cfg:
             # 合并 configurable 中的配置
             if "configurable" in cfg:

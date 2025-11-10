@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     def postgres_connection_string(self) -> str:
         """生成 PostgreSQL 连接字符串"""
         return (
-            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
+            f"postgresql://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
         

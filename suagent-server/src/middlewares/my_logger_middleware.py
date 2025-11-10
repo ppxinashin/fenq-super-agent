@@ -1,4 +1,4 @@
-from langchain.agents.middleware import AgentState, AgentMiddleware, PIIMiddleware
+from langchain.agents.middleware import AgentState, AgentMiddleware
 from typing import Any
 
 from langchain_core.messages import ToolMessage
