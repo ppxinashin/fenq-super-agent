@@ -116,7 +116,46 @@ CREATE INDEX IF NOT EXISTS idx_agents_agent_name ON agents(agent_name) WHERE is_
 CREATE INDEX IF NOT EXISTS idx_agents_created_at ON agents(created_at);
 
 -- =====================================================
--- 5. 创建会话日志表 (session_logs)
+-- 5. 创建会话表 (sessions)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS sessions (
+    -- 主键和基础字段
+    id BIGINT PRIMARY KEY,
+    
+    -- 会话信息字段
+    agent_id VARCHAR(100) NOT NULL,
+    session_id BIGINT UNIQUE NOT NULL,
+    title VARCHAR(200),
+    
+    -- 审计字段
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(100) DEFAULT 'admin',
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(100) DEFAULT 'admin',
+    is_deleted BOOLEAN DEFAULT FALSE
+);
+
+-- 会话表注释
+COMMENT ON TABLE sessions IS '会话表';
+COMMENT ON COLUMN sessions.id IS '主键ID（雪花ID）';
+COMMENT ON COLUMN sessions.agent_id IS '智能体英文名';
+COMMENT ON COLUMN sessions.session_id IS '会话ID（唯一）';
+COMMENT ON COLUMN sessions.title IS '会话标题（第一轮对话后设置）';
+COMMENT ON COLUMN sessions.created_at IS '创建时间';
+COMMENT ON COLUMN sessions.created_by IS '创建人';
+COMMENT ON COLUMN sessions.updated_at IS '更新时间';
+COMMENT ON COLUMN sessions.updated_by IS '更新人';
+COMMENT ON COLUMN sessions.is_deleted IS '是否删除（软删除标记）';
+
+-- 会话表索引
+CREATE INDEX IF NOT EXISTS idx_session_agent_id ON sessions(agent_id) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_session_session_id ON sessions(session_id) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_session_agent_id_session_id ON sessions(agent_id, session_id) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at);
+
+-- =====================================================
+-- 6. 创建会话日志表 (session_logs)
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS session_logs (
@@ -157,7 +196,7 @@ CREATE INDEX IF NOT EXISTS idx_session_logs_session_id_agent_id ON session_logs(
 CREATE INDEX IF NOT EXISTS idx_session_logs_session_id_created_at ON session_logs(session_id, created_at) WHERE is_deleted = FALSE;
 
 -- =====================================================
--- 6. 创建用户长期记忆设置表 (user_memory_settings)
+-- 7. 创建用户长期记忆设置表 (user_memory_settings)
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS user_memory_settings (
@@ -192,7 +231,7 @@ CREATE INDEX IF NOT EXISTS idx_user_memory_settings_username ON user_memory_sett
 CREATE INDEX IF NOT EXISTS idx_user_memory_settings_enabled ON user_memory_settings(enabled) WHERE is_deleted = FALSE;
 
 -- =====================================================
--- 7. 创建触发器函数（自动更新updated_at）
+-- 8. 创建触发器函数（自动更新updated_at）
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -216,6 +255,12 @@ CREATE TRIGGER update_agents_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_sessions_updated_at ON sessions;
+CREATE TRIGGER update_sessions_updated_at
+    BEFORE UPDATE ON sessions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 DROP TRIGGER IF EXISTS update_session_logs_updated_at ON session_logs;
 CREATE TRIGGER update_session_logs_updated_at
     BEFORE UPDATE ON session_logs
@@ -229,7 +274,7 @@ CREATE TRIGGER update_user_memory_settings_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- =====================================================
--- 8. 插入示例数据（可选）
+-- 9. 插入示例数据（可选）
 -- =====================================================
 
 -- 插入管理员用户
@@ -277,15 +322,22 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
+-- 插入示例会话
+INSERT INTO sessions (id, agent_id, session_id, title, created_by, updated_by)
+VALUES 
+    (3000000000001, 'demo_agent', 1000000001, '演示会话', 'system', 'system'),
+    (3000000000002, 'demo_agent', 1000000002, '测试会话', 'system', 'system')
+ON CONFLICT (id) DO NOTHING;
+
 -- 插入示例会话日志
 INSERT INTO session_logs (id, session_id, agent_id, role, content, created_by, updated_by)
 VALUES 
-    (3000000000001, 1000000001, 'demo_agent', 'user', '你好，请介绍一下你自己', 'system', 'system'),
-    (3000000000002, 1000000001, 'demo_agent', 'assistant', '你好！我是演示智能体，很高兴为您服务。', 'system', 'system')
+    (4000000000001, 1000000001, 'demo_agent', 'user', '你好，请介绍一下你自己', 'system', 'system'),
+    (4000000000002, 1000000001, 'demo_agent', 'assistant', '你好！我是演示智能体，很高兴为您服务。', 'system', 'system')
 ON CONFLICT (id) DO NOTHING;
 
 -- =====================================================
--- 9. 创建视图（可选）
+-- 10. 创建视图（可选）
 -- =====================================================
 
 -- 活跃用户视图（未删除的用户）
@@ -311,6 +363,35 @@ SELECT
     updated_at
 FROM agents
 WHERE is_deleted = FALSE;
+
+-- 活跃会话视图
+CREATE OR REPLACE VIEW v_active_sessions AS
+SELECT 
+    id,
+    agent_id,
+    session_id,
+    title,
+    created_at,
+    updated_at
+FROM sessions
+WHERE is_deleted = FALSE;
+
+-- 会话详情视图（关联智能体信息）
+CREATE OR REPLACE VIEW v_session_details AS
+SELECT 
+    s.id,
+    s.session_id,
+    s.agent_id,
+    a.agent_name,
+    s.title,
+    s.created_at,
+    s.updated_at,
+    COUNT(sl.id) as message_count
+FROM sessions s
+LEFT JOIN agents a ON s.agent_id = a.agent_id AND a.is_deleted = FALSE
+LEFT JOIN session_logs sl ON s.session_id = sl.session_id AND sl.is_deleted = FALSE
+WHERE s.is_deleted = FALSE
+GROUP BY s.id, s.session_id, s.agent_id, a.agent_name, s.title, s.created_at, s.updated_at;
 
 -- 会话统计视图
 CREATE OR REPLACE VIEW v_session_stats AS
@@ -338,7 +419,7 @@ WHERE a.is_deleted = FALSE
 GROUP BY a.agent_id, a.agent_name;
 
 -- =====================================================
--- 10. 授权（根据实际情况调整）
+-- 11. 授权（根据实际情况调整）
 -- =====================================================
 
 -- 授予用户权限（示例）
@@ -347,7 +428,7 @@ GROUP BY a.agent_id, a.agent_name;
 -- GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO suagent;
 
 -- =====================================================
--- 11. 完成信息
+-- 12. 完成信息
 -- =====================================================
 
 DO $$
@@ -358,18 +439,22 @@ BEGIN
     RAISE NOTICE '已创建的表:';
     RAISE NOTICE '  - users (用户表)';
     RAISE NOTICE '  - agents (智能体表)';
+    RAISE NOTICE '  - sessions (会话表)';
     RAISE NOTICE '  - session_logs (会话日志表)';
     RAISE NOTICE '  - user_memory_settings (用户长期记忆设置表)';
     RAISE NOTICE '========================================';
     RAISE NOTICE '已创建的索引:';
     RAISE NOTICE '  - 用户表: 3个索引';
     RAISE NOTICE '  - 智能体表: 3个索引';
+    RAISE NOTICE '  - 会话表: 4个索引';
     RAISE NOTICE '  - 会话日志表: 4个索引';
     RAISE NOTICE '  - 用户长期记忆设置表: 2个索引';
     RAISE NOTICE '========================================';
     RAISE NOTICE '已创建的视图:';
     RAISE NOTICE '  - v_active_users (活跃用户)';
     RAISE NOTICE '  - v_active_agents (活跃智能体)';
+    RAISE NOTICE '  - v_active_sessions (活跃会话)';
+    RAISE NOTICE '  - v_session_details (会话详情)';
     RAISE NOTICE '  - v_session_stats (会话统计)';
     RAISE NOTICE '  - v_agent_stats (智能体统计)';
     RAISE NOTICE '========================================';
@@ -379,4 +464,3 @@ BEGIN
     RAISE NOTICE '  - 演示智能体: demo_agent';
     RAISE NOTICE '========================================';
 END $$;
-

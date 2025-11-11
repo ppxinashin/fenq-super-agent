@@ -34,7 +34,7 @@ class MyAgent:
         middlewares: Optional[List[AgentMiddleware[Any, Any]]] = None,
         checkpointer: Optional[Checkpointer] = None,
         store: Optional[BaseStore] = None,
-        chat_id: Optional[str] = None,
+        chat_id: Optional[int] = None,
         user_id: Optional[str] = None,
         agent_id: Optional[str] = None,
         recursion_limit: Optional[int] = None,
@@ -76,7 +76,7 @@ class MyAgent:
         # 初始化长期记忆
         self.store = store or None
         # 初始化聊天 ID
-        self.chat_id = chat_id or str(uuid.uuid4())
+        self.chat_id = chat_id or None
         # 初始化用户 ID
         self.user_id = user_id or None
         # 初始化智能体 ID
@@ -138,7 +138,7 @@ class MyAgent:
             完整的配置字典
         """
         # 基础配置，包含 thread_id
-        config = {"configurable": {"thread_id": self.chat_id}, "recursion_limit": self.recursion_limit}
+        config = {"configurable": {"thread_id": f'{self.agent_id}_{self.chat_id}'}, "recursion_limit": self.recursion_limit}
         if self.user_id:
             config["configurable"]["user_id"] = self.user_id
         if self.agent_id:

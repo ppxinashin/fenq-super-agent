@@ -3,6 +3,7 @@
 """
 
 from datetime import datetime
+from typing import List
 from pydantic import BaseModel, Field
 
 
@@ -28,6 +29,41 @@ class SessionLogResponse(BaseModel):
                 "content": "你好，请介绍一下你自己",
                 "created_at": "2025-01-10T10:30:00",
                 "created_by": "system"
+            }
+        }
+
+
+class SessionLogListResponse(BaseModel):
+    """会话日志列表响应模型（分页）"""
+    
+    items: List[SessionLogResponse] = Field(..., description="会话日志列表")
+    total: int = Field(..., description="总记录数")
+    page: int = Field(..., description="当前页码")
+    page_size: int = Field(..., description="每页数量")
+    total_pages: int = Field(..., description="总页数")
+    has_prev: bool = Field(..., description="是否有上一页")
+    has_next: bool = Field(..., description="是否有下一页")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "items": [
+                    {
+                        "id": 3000000000001,
+                        "session_id": 1000000001,
+                        "agent_id": "demo_agent",
+                        "role": "user",
+                        "content": "你好，请介绍一下你自己",
+                        "created_at": "2025-01-10T10:30:00",
+                        "created_by": "system"
+                    }
+                ],
+                "total": 1,
+                "page": 1,
+                "page_size": 20,
+                "total_pages": 1,
+                "has_prev": False,
+                "has_next": False
             }
         }
 
@@ -81,4 +117,3 @@ class SessionSummaryResponse(BaseModel):
                 "last_message_time": "2025-01-10T11:00:00"
             }
         }
-

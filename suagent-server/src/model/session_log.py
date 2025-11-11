@@ -21,4 +21,3 @@ class SessionLog(Base):
     
     def __repr__(self):
         return f"<SessionLog(id={self.id}, session_id={self.session_id}, agent_id={self.agent_id}, role={self.role})>"
-

@@ -23,15 +23,19 @@ class BasePageKeywordRequest(BaseModel):
     """基础分页关键词查询请求模型"""
     
     page: int = Field(default=1, description="页码", ge=1)
-    page_size: int = Field(default=10, description="每页数量", ge=1, le=100)
+    page_size: int = Field(
+        default=20,
+        description="每页数量（最大20）",
+        ge=1,
+        le=20
+    )
     keyword: Optional[str] = Field(default=None, description="关键词（可选）")
     
     class Config:
         json_schema_extra = {
             "example": {
                 "page": 1,
-                "page_size": 10,
+                "page_size": 20,
                 "keyword": "查询关键词"
             }
         }
-

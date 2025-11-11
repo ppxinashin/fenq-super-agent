@@ -4,6 +4,7 @@
 
 from typing import Optional
 from pydantic import BaseModel, Field
+from src.consts import AgentConsts
 
 
 class FileRequest(BaseModel):
@@ -15,7 +16,13 @@ class FileRequest(BaseModel):
     content_type: Optional[str] = Field(None, description="文件MIME类型")
     object_path: Optional[str] = Field(None, description="对象存储路径（可选，默认使用文件名）")
     user_id: str = Field(..., description="用户ID")
-    agent_id: Optional[str] = Field(None, description="智能体ID（可选）")
+    agent_id: Optional[str] = Field(
+        None,
+        description=f"智能体ID（可选），{AgentConsts.AGENT_ID_RULE_DESC}",
+        min_length=2,
+        max_length=20,
+        pattern=AgentConsts.AGENT_ID_PATTERN
+    )
     
     class Config:
         json_schema_extra = {
@@ -29,4 +36,3 @@ class FileRequest(BaseModel):
                 "agent_id": "football"
             }
         }
-

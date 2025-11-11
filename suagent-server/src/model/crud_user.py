@@ -171,6 +171,25 @@ class CRUDUser(CRUDBase[User]):
         if not user:
             return False
         return user.role == UserRole.ADMIN
+    
+    def delete_by_user_id(
+        self,
+        db: Session,
+        user_id: int,
+        deleted_by: str = "system"
+    ) -> bool:
+        """
+        根据user_id删除用户（软删除）
+        
+        Args:
+            db: 数据库会话
+            user_id: 用户ID
+            deleted_by: 删除人
+            
+        Returns:
+            是否删除成功
+        """
+        return self.delete(db=db, id=user_id, deleted_by=deleted_by)
 
 
 # 创建全局CRUD实例

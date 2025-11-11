@@ -6,7 +6,7 @@
 from sqlalchemy import inspect
 from src.model.base import Base
 from src.model.database import engine
-from src.model import User, Agent, SessionLog  # 导入所有模型以确保注册到Base.metadata
+from src.model import User, Agent, Session, SessionLog, UserMemorySetting  # 导入所有模型以确保注册到Base.metadata
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)

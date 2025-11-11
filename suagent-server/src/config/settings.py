@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     def postgres_connection_string(self) -> str:
         """生成 PostgreSQL 连接字符串"""
         return (
-            f"postgresql://{self.postgres_user}:{self.postgres_password}"
+            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
         
@@ -91,6 +91,11 @@ class Settings(BaseSettings):
     minio_access_key: Optional[str] = Field(default=None, description="MinIO 访问密钥")
     minio_secret_key: Optional[str] = Field(default=None, description="MinIO 秘密密钥")
     minio_bucket: str = Field(default="suagent", description="MinIO 桶名称")
+
+    # ===== JWT 配置 =====
+    jwt_secret_key: str = Field(default="your-secret-key-change-this-in-production", description="JWT 密钥")
+    jwt_algorithm: str = Field(default="HS256", description="JWT 加密算法")
+    jwt_expire_minutes: int = Field(default=1440, description="JWT 过期时间（分钟，默认24小时）")
 
     class Config:
         env_file = ".env"

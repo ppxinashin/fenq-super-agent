@@ -2,6 +2,7 @@
 SessionLog模型CRUD操作
 """
 
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -171,6 +172,51 @@ class CRUDSessionLog(CRUDBase[SessionLog]):
             "has_next": page < total_pages
         }
     
+    def get_recent_paginated_by_session(
+        self,
+        db: Session,
+        session_id: int,
+        days: int = 7,
+        page: int = 1,
+        page_size: int = 20
+    ) -> Dict[str, Any]:
+        """
+        分页查询指定时间范围内的会话日志
+        
+        Args:
+            db: 数据库会话
+            session_id: 会话ID
+            days: 查询的天数范围（默认7天）
+            page: 页码（从1开始）
+            page_size: 每页记录数
+        
+        Returns:
+            包含分页信息和数据的字典
+        """
+        cutoff_time = datetime.now() - timedelta(days=days)
+        query = db.query(SessionLog).filter(
+            SessionLog.session_id == session_id,
+            SessionLog.is_deleted == False,
+            SessionLog.created_at >= cutoff_time
+        )
+        
+        total = query.count()
+        total_pages = (total + page_size - 1) // page_size if total > 0 else 1
+        page = max(1, min(page, total_pages))
+        skip = (page - 1) * page_size
+        
+        items = query.order_by(SessionLog.created_at).offset(skip).limit(page_size).all()
+        
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "has_prev": page > 1,
+            "has_next": page < total_pages
+        }
+    
     def delete_by_session_id(
         self,
         db: Session,
@@ -188,17 +234,17 @@ class CRUDSessionLog(CRUDBase[SessionLog]):
         Returns:
             删除的记录数
         """
-        logs = db.query(SessionLog).filter(
+        # 使用批量更新，提高性能
+        count = db.query(SessionLog).filter(
             SessionLog.session_id == session_id,
             SessionLog.is_deleted == False
-        ).all()
-        
-        count = 0
-        for log in logs:
-            log.is_deleted = True
-            log.updated_by = deleted_by
-            db.add(log)
-            count += 1
+        ).update(
+            {
+                "is_deleted": True,
+                "updated_by": deleted_by
+            },
+            synchronize_session=False
+        )
         
         db.commit()
         return count
@@ -295,7 +341,13 @@ class CRUDSessionLog(CRUDBase[SessionLog]):
         
         return [r[0] for r in results]
 
+    def count_sessions_by_agent(self, db: Session, agent_id: str) -> int:
+        """统计指定智能体的会话数量（按 session_id 去重）"""
+        return db.query(SessionLog.session_id).filter(
+            SessionLog.agent_id == agent_id,
+            SessionLog.is_deleted == False
+        ).distinct().count()
+
 
 # 创建全局CRUD实例
 crud_session_log = CRUDSessionLog(SessionLog)
-

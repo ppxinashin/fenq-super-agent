@@ -40,3 +40,6 @@ python-dotenv==1.2.1              # 读取 .env 配置 :contentReference[oaicite
 requests==2.32.5                  # 通用 HTTP 客户端（LangChain 外独立调用 MCP/REST）
 langmem==0.0.30                    # LangChain 长期记忆
 ddgs==9.8.0                       # 搜索引擎
+
+# ===== 认证相关 =====
+pyjwt==2.10.1                      # JWT token 生成和验证

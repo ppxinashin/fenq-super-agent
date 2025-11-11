@@ -2,7 +2,7 @@ from langchain_core.messages import HumanMessage
 from langchain.agents.middleware import ToolCallLimitMiddleware
 from src.agents import MyAgent
 from src.memory import RedisShortMemory
-from src.middlewares import get_my_logger_middleware
+from src.middlewares import get_my_logger_middleware, get_session_middleware
 from src.tools import create_now_time_tool, create_web_search_tool, create_web_scraper_tool
 
 search_tool = create_web_search_tool()
@@ -31,9 +31,13 @@ if __name__ == "__main__":
     # 创建 agent，配置工具调用限制和递归限制
     agent = MyAgent(
         checkpointer=RedisShortMemory.get_checkpointer(),
+        chat_id=2,
+        user_id="admin",
+        agent_id="search_tool",
         # 按顺序应用中间件：先记录日志，再限制工具调用次数
         middlewares=[
             get_my_logger_middleware(), 
+            get_session_middleware(),
             ToolCallLimitMiddleware(run_limit=10, exit_behavior="end")
         ],
         tools=[now_time_tool, search_tool, scrape_tool],

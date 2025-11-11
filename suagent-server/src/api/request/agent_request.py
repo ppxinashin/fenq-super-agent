@@ -4,12 +4,19 @@
 
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
+from src.consts import AgentConsts
 
 
 class AgentAddRequest(BaseModel):
     """智能体新增请求模型"""
     
-    agent_id: str = Field(..., description="智能体英文名（唯一标识）", min_length=2, max_length=100)
+    agent_id: str = Field(
+        ...,
+        description=f"智能体英文名（唯一标识），{AgentConsts.AGENT_ID_RULE_DESC}",
+        min_length=2,
+        max_length=20,
+        pattern=AgentConsts.AGENT_ID_PATTERN
+    )
     agent_name: str = Field(..., description="智能体中文名", min_length=2, max_length=100)
     description: Optional[str] = Field(None, description="智能体介绍")
     system_prompt: str = Field(..., description="系统提示词", min_length=1)
@@ -42,7 +49,13 @@ class AgentEditRequest(BaseModel):
     """智能体编辑请求模型"""
     
     id: int = Field(..., description="智能体ID", gt=0)
-    agent_id: Optional[str] = Field(None, description="智能体英文名（唯一标识）", min_length=2, max_length=100)
+    agent_id: Optional[str] = Field(
+        None,
+        description=f"智能体英文名（唯一标识），{AgentConsts.AGENT_ID_RULE_DESC}",
+        min_length=2,
+        max_length=20,
+        pattern=AgentConsts.AGENT_ID_PATTERN
+    )
     agent_name: Optional[str] = Field(None, description="智能体中文名", min_length=2, max_length=100)
     description: Optional[str] = Field(None, description="智能体介绍")
     system_prompt: Optional[str] = Field(None, description="系统提示词")
@@ -70,4 +83,3 @@ class AgentEditRequest(BaseModel):
                 "updated_by": "admin"
             }
         }
-

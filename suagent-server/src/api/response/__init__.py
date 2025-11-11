@@ -22,12 +22,14 @@ from .agent_response import (
     AgentResponse,
     AgentSimpleResponse,
     AgentListResponse,
-    AgentConfigResponse
+    AgentConfigResponse,
+    AgentPublicResponse
 )
 
 # 会话日志响应模型
 from .session_log_response import (
     SessionLogResponse,
+    SessionLogListResponse,
     SessionLogSimpleResponse,
     SessionMessageResponse,
     SessionSummaryResponse
@@ -69,9 +71,11 @@ __all__ = [
     "AgentSimpleResponse",
     "AgentListResponse",
     "AgentConfigResponse",
+    "AgentPublicResponse",
     
     # 会话日志响应模型
     "SessionLogResponse",
+    "SessionLogListResponse",
     "SessionLogSimpleResponse",
     "SessionMessageResponse",
     "SessionSummaryResponse",
@@ -87,4 +91,3 @@ __all__ = [
     "RAGFileSummaryResponse",
     "RAGFileChunkSimpleResponse",
 ]
-

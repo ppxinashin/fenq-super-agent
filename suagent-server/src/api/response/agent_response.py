@@ -88,3 +88,12 @@ class AgentConfigResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class AgentPublicResponse(BaseModel):
+    """智能体公开展示响应模型（仅名称与介绍）"""
+    
+    agent_name: str = Field(..., description="智能体中文名")
+    description: Optional[str] = Field(None, description="智能体介绍")
+    
+    class Config:
+        from_attributes = True

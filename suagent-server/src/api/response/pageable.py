@@ -139,3 +139,42 @@ def create_pageable(
         data=data
     )
 
+
+class PageableResponse(BaseModel, Generic[T]):
+    """
+    分页响应格式（标准版）
+    
+    Attributes:
+        items: 数据列表
+        total: 总记录数
+        page: 当前页码
+        page_size: 每页数量
+        total_pages: 总页数
+        has_prev: 是否有上一页
+        has_next: 是否有下一页
+    """
+    
+    items: List[T] = Field(default_factory=list, description="数据列表")
+    total: int = Field(..., description="总记录数", ge=0)
+    page: int = Field(..., description="当前页码（从1开始）", ge=1)
+    page_size: int = Field(..., description="每页数量", ge=1)
+    total_pages: int = Field(..., description="总页数", ge=0)
+    has_prev: bool = Field(..., description="是否有上一页")
+    has_next: bool = Field(..., description="是否有下一页")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "items": [
+                    {"id": 1, "name": "item1"},
+                    {"id": 2, "name": "item2"}
+                ],
+                "total": 100,
+                "page": 1,
+                "page_size": 10,
+                "total_pages": 10,
+                "has_prev": False,
+                "has_next": True
+            }
+        }
+
