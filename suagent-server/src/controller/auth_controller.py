@@ -5,7 +5,6 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
-from src.consts.user_consts import UserConsts
 from src.model.database import get_db
 from src.request.auth_request import LoginRequest, RegisterRequest, ChangePasswordRequest, LogoutRequest
 from src.response.base_response import ApiResponse, success_response, business_error_response
@@ -28,11 +27,11 @@ async def register(
     register_request: RegisterRequest,
     db: Session = Depends(get_db)
 ):
-    f"""
+    """
     用户注册
 
-    - **username**: 用户名，{UserConsts.USERNAME_MIN_LENGTH}-{UserConsts.USERNAME_DISPLAY_MAX_LENGTH}个字符，只允许大小写字母、数字和下划线
-    - **password**: 密码，至少{UserConsts.PASSWORD_MIN_LENGTH}位ASCII可见字符
+    - **username**: 用户名，3-20个字符，只允许大小写字母、数字和下划线
+    - **password**: 密码，至少8位ASCII可见字符
     - **confirm_password**: 确认密码，必须与密码一致
     """
     try:
@@ -43,10 +42,7 @@ async def register(
         return business_error_response(str(e))
     except Exception as e:
         logger.error(f"注册接口异常: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="注册失败，请稍后重试"
-        )
+        return ApiResponse.error("注册失败，请稍后重试", 500)
 
 
 @router.post("/login", response_model=ApiResponse[LoginResponse])
@@ -70,10 +66,7 @@ async def login(
         return business_error_response(str(e))
     except Exception as e:
         logger.error(f"登录接口异常: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="登录失败，请稍后重试"
-        )
+        return ApiResponse.error("登录失败，请稍后重试", 500)
 
 
 @router.post("/logout", response_model=ApiResponse[LogoutResponse])
@@ -99,10 +92,7 @@ async def logout(
 
     except Exception as e:
         logger.error(f"退出登录接口异常: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="退出登录失败，请稍后重试"
-        )
+        return ApiResponse.error("退出登录失败，请稍后重试", 500)
 
 
 @router.post("/change-password", response_model=ApiResponse[ChangePasswordResponse])
@@ -132,10 +122,7 @@ async def change_password(
         return business_error_response(str(e))
     except Exception as e:
         logger.error(f"修改密码接口异常: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="密码修改失败，请稍后重试"
-        )
+        return ApiResponse.error("密码修改失败，请稍后重试", 500)
 
 
 @router.get("/me", response_model=ApiResponse[UserInfo])
@@ -196,10 +183,7 @@ async def validate_token(
 
     except Exception as e:
         logger.error(f"验证token接口异常: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Token验证失败，请稍后重试"
-        )
+        return ApiResponse.error("Token验证失败，请稍后重试", 500)
 
 
 @router.post("/refresh-token", response_model=ApiResponse[dict])
@@ -233,10 +217,7 @@ async def refresh_token(
 
     except Exception as e:
         logger.error(f"刷新token接口异常: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Token刷新失败，请稍后重试"
-        )
+        return ApiResponse.error("Token刷新失败，请稍后重试", 500)
 
 
 @router.get("/health")

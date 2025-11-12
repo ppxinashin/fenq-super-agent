@@ -2,8 +2,9 @@
 User模型CRUD操作
 """
 
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from src.model.crud_base import CRUDBase
 from src.model.user import User, UserRole
 
@@ -180,16 +181,138 @@ class CRUDUser(CRUDBase[User]):
     ) -> bool:
         """
         根据user_id删除用户（软删除）
-        
+
         Args:
             db: 数据库会话
             user_id: 用户ID
             deleted_by: 删除人
-            
+
         Returns:
             是否删除成功
         """
         return self.delete(db=db, id=user_id, deleted_by=deleted_by)
+
+    def get_by_id(self, db: Session, user_id: int) -> Optional[User]:
+        """
+        根据用户ID获取用户
+
+        Args:
+            db: 数据库会话
+            user_id: 用户ID
+
+        Returns:
+            用户对象，未找到返回None
+        """
+        return db.query(User).filter(
+            User.id == user_id
+        ).first()
+
+    def create(self, db: Session, obj_in: dict, created_by: str = "system") -> Optional[User]:
+        """
+        创建用户（适配用户管理服务的接口）
+
+        Args:
+            db: 数据库会话
+            obj_in: 用户数据字典
+            created_by: 创建人
+
+        Returns:
+            创建的用户对象
+        """
+        # 如果传入的数据中没有password_hash但有password，则进行哈希处理
+        if "password" in obj_in and "password_hash" not in obj_in:
+            salt = User.generate_salt()
+            password = User.hash_password(obj_in["password"], salt)
+            obj_in["password"] = password
+            obj_in["salt"] = salt
+
+        # 移除password_hash字段，如果存在
+        if "password_hash" in obj_in:
+            obj_in.pop("password_hash")
+
+        return super().create(db=db, obj_in=obj_in, created_by=created_by)
+
+    def update_user_info(self, db: Session, user_id: int, obj_in: dict, updated_by: str = "system") -> Optional[User]:
+        """
+        更新用户（适配用户管理服务的接口）
+
+        Args:
+            db: 数据库会话
+            user_id: 用户ID
+            obj_in: 更新数据字典
+            updated_by: 更新人
+
+        Returns:
+            更新后的用户对象
+        """
+        user = self.get(db=db, id=user_id)
+        if not user:
+            return None
+
+        update_data = obj_in.copy()
+
+        # 如果有password_hash字段，需要转换为password和salt
+        if "password_hash" in update_data:
+            password_hash = update_data.pop("password_hash")
+            salt = User.generate_salt()
+            password = password_hash  # 这里假设传入的已经是最终的哈希值
+            update_data["password"] = password
+            update_data["salt"] = salt
+
+        return super().update(db=db, db_obj=user, obj_in=update_data, updated_by=updated_by)
+
+    def soft_delete(self, db: Session, user_id: int, deleted_by: str = "system") -> bool:
+        """
+        逻辑删除用户
+
+        Args:
+            db: 数据库会话
+            user_id: 用户ID
+            deleted_by: 删除人
+
+        Returns:
+            是否删除成功
+        """
+        return self.delete(db=db, id=user_id, deleted_by=deleted_by)
+
+    def get_user_list(
+        self,
+        db: Session,
+        page: int = 1,
+        page_size: int = 20,
+        keyword: Optional[str] = None
+    ) -> Tuple[List[User], int]:
+        """
+        分页查询用户列表
+
+        Args:
+            db: 数据库会话
+            page: 页码
+            page_size: 每页数量
+            keyword: 关键词搜索
+
+        Returns:
+            (用户列表, 总数)
+        """
+        query = db.query(User).filter(User.is_deleted == False)
+
+        # 关键词搜索
+        if keyword:
+            query = query.filter(
+                or_(
+                    User.username.ilike(f"%{keyword}%"),
+                    User.role.ilike(f"%{keyword}%")
+                )
+            )
+
+        # 计算总数
+        total = query.count()
+
+        # 分页
+        offset = (page - 1) * page_size
+        users = query.offset(offset).limit(page_size).all()
+
+        return users, total
 
 
 # 创建全局CRUD实例

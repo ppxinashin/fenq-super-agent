@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from src.config.settings import settings
 from src.controller.auth_controller import router as auth_router
+from src.controller.user_manage_controller import router as user_manage_router
+from src.api_middlewares.exception_middleware import ExceptionMiddleware
 from src.utils.logger import get_logger
 import uvicorn
 
@@ -73,6 +75,9 @@ app = FastAPI(
     redoc_url="/redoc" if settings.debug else None,
 )
 
+# 添加异常处理中间件（需要最先添加，以便捕获所有异常）
+app.add_middleware(ExceptionMiddleware)
+
 # 添加CORS中间件
 app.add_middleware(
     CORSMiddleware,
@@ -84,6 +89,7 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(user_manage_router, prefix="/api/v1")
 
 
 @app.get("/")
@@ -135,25 +141,28 @@ async def health_check():
     }
 
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request, exc):
-    """HTTP异常处理器"""
-    return {
-        "code": exc.status_code,
-        "message": exc.detail,
-        "result": None
-    }
+# 注意：由于已经添加了 ExceptionMiddleware，以下异常处理器不再需要
+# ExceptionMiddleware 会统一处理所有异常并返回标准JSON格式
 
-
-@app.exception_handler(Exception)
-async def general_exception_handler(request, exc):
-    """通用异常处理器"""
-    logger.error(f"未处理的异常: {exc}", exc_info=True)
-    return {
-        "code": 500,
-        "message": "服务器内部错误",
-        "result": None
-    }
+# @app.exception_handler(HTTPException)
+# async def http_exception_handler(request, exc):
+#     """HTTP异常处理器"""
+#     return {
+#         "code": exc.status_code,
+#         "message": exc.detail,
+#         "result": None
+#     }
+#
+#
+# @app.exception_handler(Exception)
+# async def general_exception_handler(request, exc):
+#     """通用异常处理器"""
+#     logger.error(f"未处理的异常: {exc}", exc_info=True)
+#     return {
+#         "code": 500,
+#         "message": "服务器内部错误",
+#         "result": None
+#     }
 
 
 if __name__ == "__main__":
