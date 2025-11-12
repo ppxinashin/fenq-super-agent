@@ -1,0 +1,35 @@
+# ===== Memory Sync Scheduler Requirements =====
+# 定时记忆同步系统依赖包
+
+# ===== Core dependencies =====
+celery==5.3.0                      # Celery 分布式任务队列
+redis==5.0.0                       # Redis 客户端（Celery 后端）
+flower==2.0.1                      # Celery 监控工具
+kombu==5.3.0                       # Celery 消息库
+amqp==5.1.1                        # AMQP 协议客户端
+
+# ===== Database dependencies =====
+psycopg2-binary==2.9.5             # PostgreSQL 驱动
+sqlalchemy==2.0.0                  # SQL ORM 框架
+alembic==1.13.1                    # 数据库迁移工具
+
+# ===== Storage dependencies =====
+minio==7.2.16                      # MinIO 对象存储
+
+# ===== Memory management =====
+langmem==0.0.30                    # LangChain 长期记忆
+
+# ===== State and serialization =====
+msgpack==1.1.0                     # 轻量高性能序列化
+
+# ===== Logging and configuration =====
+loguru==0.7.3                      # 便捷日志库
+python-dotenv==1.2.1              # 读取 .env 配置
+pydantic==2.10.5                   # 数据验证和设置管理
+pydantic-settings==2.7.1          # Pydantic 环境设置管理
+
+# ===== HTTP client =====
+requests==2.32.5                  # 通用 HTTP 客户端
+
+# ===== Authentication =====
+pyjwt==2.10.1                      # JWT token 生成和验证

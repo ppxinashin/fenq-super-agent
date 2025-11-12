@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+      "suagent-youtube-mcp": {
+        "type": "sse",
+        "url": "http://127.0.0.1:10086/sse"
+      },
+      "amap-maps": {
+        "type": "sse",
+        "url": "https://mcp.api-inference.modelscope.net/xxxx/sse"
+      }
+    }
+}
