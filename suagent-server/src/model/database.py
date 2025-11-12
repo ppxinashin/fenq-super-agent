@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from src.config import settings
+from src.config.settings import settings
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)

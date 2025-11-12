@@ -2,6 +2,7 @@ import hashlib
 import uuid
 import enum
 from sqlalchemy import Column, String, Index, Enum
+from src.consts.user_consts import UserConsts
 from src.model.base import Base
 
 
@@ -15,10 +16,10 @@ class User(Base):
     """用户表"""
     __tablename__ = "users"
     
-    username = Column(String(50), unique=True, nullable=False, comment="用户名")
+    username = Column(String(UserConsts.USERNAME_MAX_LENGTH), unique=True, nullable=False, comment="用户名")
     password = Column(String(32), nullable=False, comment="密码(MD5加密)")
     salt = Column(String(4), nullable=False, comment="盐(从uuid4中取最后四位)")
-    role = Column(Enum(UserRole), default=UserRole.USER, nullable=False, comment="用户角色(admin/user)")
+    role = Column(Enum(UserConsts.USER_ROLE_ADMIN, UserConsts.USER_ROLE_USER, name="user_role"), default=UserConsts.USER_ROLE_USER, nullable=False, comment="用户角色(admin/user)")
     
     # 创建索引
     __table_args__ = (
@@ -60,5 +61,7 @@ class User(Base):
         return str(self.password) == hashed
     
     def __repr__(self):
-        return f"<User(id={self.id}, username={self.username}, role={self.role.value})>"
+        # 处理 role 可能是字符串或枚举对象的情况
+        role_value = self.role.value if hasattr(self.role, 'value') else self.role
+        return f"<User(id={self.id}, username={self.username}, role={role_value})>"
 

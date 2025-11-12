@@ -2,19 +2,55 @@
 
 智能体服务器，提供完整的RESTful API接口，支持文件管理、会话管理、Agent管理等功能。
 
-## 🚀 快速开始
+## 🔧 环境设置
 
-### 1. 环境要求
+### Conda 环境
 
-- Python 3.8+
+本项目使用专门的 conda 环境：`suagent-server`
+
+```bash
+# 检查环境
+python check_environment.py
+
+# 确认在正确环境中
+which python  # 应该指向: /home/ubuntu/miniconda3/envs/suagent-server/bin/python
+```
+
+### 环境要求
+
+- ✅ Python 3.13.9 (conda suagent-server环境)
 - PostgreSQL
 - Redis
 - MinIO
 
+## 🚀 快速开始
+
+### 1. 环境检查
+
+```bash
+# 验证环境配置
+python check_environment.py
+```
+
 ### 2. 安装依赖
 
 ```bash
+# 在suagent-server conda环境中
 pip install -r requirements.txt
+```
+
+### 3. 启动服务器
+
+```bash
+# 启动API服务器
+python start_server.py
+```
+
+### 4. 测试认证功能
+
+```bash
+# 运行完整认证测试
+python test_auth.py
 ```
 
 ### 3. 配置环境变量

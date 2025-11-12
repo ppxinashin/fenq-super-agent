@@ -42,4 +42,5 @@ langmem==0.0.30                    # LangChain 长期记忆
 ddgs==9.8.0                       # 搜索引擎
 
 # ===== 认证相关 =====
+python-jose[cryptography]==3.5.0   # JWT token 生成和验证
 pyjwt==2.10.1                      # JWT token 生成和验证

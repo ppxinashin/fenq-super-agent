@@ -39,7 +39,7 @@ class CRUDUser(CRUDBase[User]):
             "username": username,
             "password": password,
             "salt": salt,
-            "role": role
+            "role": role.value if isinstance(role, UserRole) else role  # 传递字符串值
         }
         
         return self.create(db=db, obj_in=user_data, created_by=created_by)
@@ -153,7 +153,7 @@ class CRUDUser(CRUDBase[User]):
         if not user:
             return None
         
-        update_data = {"role": new_role}
+        update_data = {"role": new_role.value if isinstance(new_role, UserRole) else new_role}  # 传递字符串值
         return self.update(db=db, db_obj=user, obj_in=update_data, updated_by=updated_by)
     
     def is_admin(self, db: Session, user_id: int) -> bool:
