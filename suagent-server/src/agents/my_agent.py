@@ -122,11 +122,11 @@ class MyAgent:
     
     def ainvoke(self, input, cfg:dict[str, Any] | None = None):
         config = self._build_config(cfg)
-        return self._agent.ainvoke(input, config, context=self.context)
+        return self._agent.ainvoke(input, config, context=self.context, stream_mode="messages")
     
     def astream(self, input, cfg:dict[str, Any] | None = None):
         config = self._build_config(cfg)
-        return self._agent.astream(input, config, context=self.context)
+        return self._agent.astream(input, config, context=self.context, stream_mode="messages")
     
     def _build_config(self, cfg: dict[str, Any] | None = None) -> RunnableConfig:
         """构建配置字典

@@ -2,16 +2,37 @@
 FastAPI应用主入口
 """
 
+import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import json
+from langchain_core.messages import HumanMessage
+from starlette.responses import StreamingResponse
 from src.config.settings import settings
 from src.controller.auth_controller import router as auth_router
 from src.controller.user_manage_controller import router as user_manage_router
 from src.controller.agent_manage_controller import router as agent_manage_router
 from src.api_middlewares.exception_middleware import ExceptionMiddleware
+from src.middlewares import get_my_logger_middleware
 from src.utils.logger import get_logger
 import uvicorn
+from src.agents import MyAgent
+from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+
+
+# 初始化 LLM（OpenAI / Azure / 本地模型都可以）
+llm = ChatOpenAI(
+    model="qwen3-max",
+    temperature=0,
+)
+
+# 创建 Agent（create_agent 自动构建一个图）
+agent = MyAgent(
+    llm=llm,
+    middlewares=[get_my_logger_middleware()]
+)
 
 logger = get_logger(__name__)
 
@@ -142,29 +163,28 @@ async def health_check():
         }
     }
 
+async def agent_stream(prompt: str):
+    """
+    把 LangGraph 的 stream 包装成 FastAPI 能用的 async generator。
+    """
 
-# 注意：由于已经添加了 ExceptionMiddleware，以下异常处理器不再需要
-# ExceptionMiddleware 会统一处理所有异常并返回标准JSON格式
+    # astream = 异步流式输出
+    async for event in agent.astream({"messages": [HumanMessage(content=prompt)]}):
+        data = json.dumps({"text": event[0].content}, ensure_ascii=False)
+        yield f"data: {data}\n\n"
+    
+    yield "data: [DONE]\n\n"
 
-# @app.exception_handler(HTTPException)
-# async def http_exception_handler(request, exc):
-#     """HTTP异常处理器"""
-#     return {
-#         "code": exc.status_code,
-#         "message": exc.detail,
-#         "result": None
-#     }
-#
-#
-# @app.exception_handler(Exception)
-# async def general_exception_handler(request, exc):
-#     """通用异常处理器"""
-#     logger.error(f"未处理的异常: {exc}", exc_info=True)
-#     return {
-#         "code": 500,
-#         "message": "服务器内部错误",
-#         "result": None
-#     }
+
+@app.get("/agent_health")
+async def agent_health():
+    """
+    智能体健康检测
+    """
+    return StreamingResponse(
+        agent_stream("你好，这里是Fenq Super Agent，目前服务器已经启动，如果能够接收我的消息，请回复“收到”"),
+        media_type="text/event-stream",
+    )
 
 
 if __name__ == "__main__":
