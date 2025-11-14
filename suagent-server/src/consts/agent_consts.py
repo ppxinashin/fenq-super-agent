@@ -5,7 +5,46 @@
 
 class AgentConsts:
     """智能体常量集合"""
-    
-    # 仅允许大小写字母、数字、下划线，长度2-20
-    AGENT_ID_PATTERN = r"^[A-Za-z0-9_]{2,20}$"
-    AGENT_ID_RULE_DESC = "仅支持大小写字母、数字以及下划线，长度需在2-20字符之间"
+
+    # 智能体英文名（agent_id）规则
+    AGENT_ID_MAX_LENGTH = 20
+    AGENT_ID_MIN_LENGTH = 2
+    AGENT_ID_PATTERN = r"^[A-Za-z0-9_]{" + str(AGENT_ID_MIN_LENGTH) + "," + str(AGENT_ID_MAX_LENGTH) + "}$"
+    AGENT_ID_RULE_DESC = f"仅支持大小写字母、数字以及下划线，长度需在{AGENT_ID_MIN_LENGTH}-{AGENT_ID_MAX_LENGTH}字符之间"
+    AGENT_ID_FORBIDDEN_NAMES = ["memory"]  # 禁止使用的智能体名称
+
+    # 智能体中文名（agent_name）规则
+    AGENT_NAME_MAX_LENGTH = 100
+    AGENT_NAME_MIN_LENGTH = 1
+
+    # 智能体介绍规则
+    AGENT_DESCRIPTION_MAX_LENGTH = 500
+
+    # 系统提示词规则
+    AGENT_SYSTEM_PROMPT_MAX_LENGTH = 10000
+
+    # 默认值
+    DEFAULT_AGENT_NAME = "新智能体"
+    DEFAULT_AGENT_DESCRIPTION = "这是一个智能体"
+    DEFAULT_SYSTEM_PROMPT = "你是一个有用的AI助手。"
+
+    # 工具列表（可用的工具集合）
+    AVAILABLE_TOOLS = [
+        "calculator",     # 计算器
+        "downloader",     # 文件下载
+        "file_opt",       # 文件操作
+        "now_time",       # 当前时间
+        "rag",           # RAG检索
+        "long_memroy",   # 长期记忆
+        "terminal_opt",   # 终端操作
+        "web_scraper",   # 网页抓取
+        "web_search",    # 网页搜索
+    ]
+
+    # MCP状态
+    MCP_STATUS_ENABLED = "enabled"
+    MCP_STATUS_DISABLED = "disabled"
+
+    # 创建者类型
+    CREATOR_ADMIN = "admin"
+    CREATOR_USER = "user"

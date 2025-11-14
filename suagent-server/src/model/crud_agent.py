@@ -2,8 +2,9 @@
 Agent模型CRUD操作
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from src.model.crud_base import CRUDBase
 from src.model.agent import Agent
 
@@ -159,6 +160,136 @@ class CRUDAgent(CRUDBase[Agent]):
             update_data["mcp_servers"] = mcp_servers
         
         return self.update(db=db, db_obj=agent, obj_in=update_data, updated_by=updated_by)
+
+    def get_agent_list(
+        self,
+        db: Session,
+        page: int = 1,
+        page_size: int = 20,
+        keyword: Optional[str] = None
+    ) -> Tuple[List[Agent], int]:
+        """
+        分页获取智能体列表（卡片展示用）
+
+        Args:
+            db: 数据库会话
+            page: 页码
+            page_size: 每页数量
+            keyword: 关键词搜索
+
+        Returns:
+            (智能体列表, 总数)
+        """
+        query = db.query(Agent).filter(Agent.is_deleted == False)
+
+        # 关键词搜索
+        if keyword:
+            query = query.filter(
+                or_(
+                    Agent.agent_name.ilike(f"%{keyword}%"),
+                    Agent.description.ilike(f"%{keyword}%")
+                )
+            )
+
+        # 按创建时间倒序排列
+        query = query.order_by(Agent.created_at.desc())
+
+        # 计算总数
+        total = query.count()
+
+        # 分页
+        offset = (page - 1) * page_size
+        agents = query.offset(offset).limit(page_size).all()
+
+        return agents, total
+
+    def get_agent_management_list(
+        self,
+        db: Session,
+        page: int = 1,
+        page_size: int = 20,
+        keyword: Optional[str] = None,
+        created_by: Optional[str] = None
+    ) -> Tuple[List[Agent], int]:
+        """
+        分页获取智能体管理列表
+
+        Args:
+            db: 数据库会话
+            page: 页码
+            page_size: 每页数量
+            keyword: 关键词搜索
+            created_by: 创建者过滤，None表示查询所有
+
+        Returns:
+            (智能体列表, 总数)
+        """
+        query = db.query(Agent).filter(Agent.is_deleted == False)
+
+        # 创建者过滤
+        if created_by:
+            query = query.filter(Agent.created_by == created_by)
+
+        # 关键词搜索
+        if keyword:
+            query = query.filter(
+                or_(
+                    Agent.agent_name.ilike(f"%{keyword}%"),
+                    Agent.description.ilike(f"%{keyword}%")
+                )
+            )
+
+        # 按创建时间倒序排列
+        query = query.order_by(Agent.created_at.desc())
+
+        # 计算总数
+        total = query.count()
+
+        # 分页
+        offset = (page - 1) * page_size
+        agents = query.offset(offset).limit(page_size).all()
+
+        return agents, total
+
+    def soft_delete_agent(
+        self,
+        db: Session,
+        agent_id: str,
+        deleted_by: str = "system"
+    ) -> bool:
+        """
+        逻辑删除智能体
+
+        Args:
+            db: 数据库会话
+            agent_id: 智能体ID
+            deleted_by: 删除人
+
+        Returns:
+            是否删除成功
+        """
+        agent = self.get_by_agent_id(db, agent_id)
+        if not agent:
+            return False
+
+        return self.delete(db=db, id=agent.id, deleted_by=deleted_by)
+
+    def check_agent_id_exists(self, db: Session, agent_id: str) -> bool:
+        """
+        检查智能体ID是否已存在
+
+        Args:
+            db: 数据库会话
+            agent_id: 智能体ID
+
+        Returns:
+            是否已存在
+        """
+        agent = db.query(Agent).filter(
+            Agent.agent_id == agent_id,
+            Agent.is_deleted == False
+        ).first()
+        return agent is not None
 
 
 # 创建全局CRUD实例

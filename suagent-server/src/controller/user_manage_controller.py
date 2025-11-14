@@ -5,11 +5,13 @@
 from fastapi import APIRouter, Depends, Request, HTTPException
 from typing import Dict, Any
 from src.api_middlewares.role_middleware import require_admin
+from src.api_middlewares.jwt_middleware import get_current_user_from_token
 from src.service.user_manage_service import user_manage_service
 from src.request.user_manage_request import UserUpdateRequest, UserCreateRequest, UserListRequest
 from src.request.base_request import BaseIDRequest
 from src.response.base_response import ApiResponse, success_response, error_response, business_error_response
 from src.response.user_manage_response import UserInfo, UserListItem
+from src.response.auth_response import UserInfo as AuthUserInfo
 from src.response.pageable import Pageable
 from src.utils.logger import get_logger
 
@@ -19,7 +21,7 @@ router = APIRouter(tags=["用户管理"])
 
 @router.put("/users", response_model=ApiResponse[UserInfo], summary="修改用户信息")
 @require_admin()
-async def update_user(request: Request, user_update: UserUpdateRequest):
+async def update_user(request: Request, user_update: UserUpdateRequest, current_user: AuthUserInfo = Depends(get_current_user_from_token)):
     """
     管理员修改用户信息
 
@@ -31,7 +33,7 @@ async def update_user(request: Request, user_update: UserUpdateRequest):
     try:
         logger.info(f"管理员修改用户信息: user_id={user_update.user_id}, role={user_update.role}")
 
-        user_info = user_manage_service.update_user(user_update)
+        user_info = user_manage_service.update_user(user_update, current_user.id, current_user.username)
 
         return success_response(
             result=user_info,
@@ -45,7 +47,7 @@ async def update_user(request: Request, user_update: UserUpdateRequest):
 
 @router.post("/users", response_model=ApiResponse[UserInfo], summary="创建新用户")
 @require_admin()
-async def create_user(request: Request, user_create: UserCreateRequest):
+async def create_user(request: Request, user_create: UserCreateRequest, current_user: AuthUserInfo = Depends(get_current_user_from_token)):
     """
     管理员创建新用户
 
@@ -56,7 +58,7 @@ async def create_user(request: Request, user_create: UserCreateRequest):
     try:
         logger.info(f"管理员创建新用户: username={user_create.username}, role={user_create.role}")
 
-        user_info = user_manage_service.create_user(user_create)
+        user_info = user_manage_service.create_user(user_create, current_user.id, current_user.username)
 
         return success_response(
             result=user_info,
@@ -126,7 +128,7 @@ async def get_user_list(request: Request, page: int = 1, page_size: int = 20, ke
 
 @router.delete("/users/{user_id}", response_model=ApiResponse[bool], summary="删除用户")
 @require_admin()
-async def delete_user(request: Request, user_id: int):
+async def delete_user(request: Request, user_id: int, current_user: AuthUserInfo = Depends(get_current_user_from_token)):
     """
     管理员删除用户
 
@@ -136,7 +138,7 @@ async def delete_user(request: Request, user_id: int):
     try:
         logger.info(f"管理员删除用户: user_id={user_id}")
 
-        success = user_manage_service.delete_user(user_id)
+        success = user_manage_service.delete_user(user_id, current_user.id, current_user.username)
 
         return success_response(
             result=success,

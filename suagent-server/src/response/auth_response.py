@@ -3,7 +3,7 @@
 """
 
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 from datetime import datetime
 
 
@@ -15,6 +15,12 @@ class UserInfo(BaseModel):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: Optional[datetime] = Field(None, description="更新时间")
 
+    @field_serializer('created_at', 'updated_at')
+    def format_datetime(self, value: Optional[datetime]) -> Optional[str]:
+        if value is None:
+            return None
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+
     class Config:
         from_attributes = True
         json_schema_extra = {
@@ -22,8 +28,8 @@ class UserInfo(BaseModel):
                 "id": 1,
                 "username": "admin",
                 "role": "admin",
-                "created_at": "2024-01-01T00:00:00Z",
-                "updated_at": "2024-01-02T00:00:00Z"
+                "created_at": "2024-01-01 00:00:00",
+                "updated_at": "2024-01-02 00:00:00"
             }
         }
 
@@ -45,8 +51,8 @@ class LoginResponse(BaseModel):
                     "id": 1,
                     "username": "admin",
                     "role": "admin",
-                    "created_at": "2024-01-01T00:00:00Z",
-                    "updated_at": "2024-01-02T00:00:00Z"
+                    "created_at": "2024-01-01 00:00:00",
+                    "updated_at": "2024-01-02 00:00:00"
                 }
             }
         }
@@ -100,6 +106,12 @@ class TokenValidationResponse(BaseModel):
     user_info: Optional[UserInfo] = Field(None, description="用户信息（Token有效时）")
     expires_at: Optional[datetime] = Field(None, description="Token过期时间")
 
+    @field_serializer('expires_at')
+    def format_datetime(self, value: Optional[datetime]) -> Optional[str]:
+        if value is None:
+            return None
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -108,9 +120,9 @@ class TokenValidationResponse(BaseModel):
                     "id": 1,
                     "username": "admin",
                     "role": "admin",
-                    "created_at": "2024-01-01T00:00:00Z",
-                    "updated_at": "2024-01-02T00:00:00Z"
+                    "created_at": "2024-01-01 00:00:00",
+                    "updated_at": "2024-01-02 00:00:00"
                 },
-                "expires_at": "2024-01-02T00:00:00Z"
+                "expires_at": "2024-01-02 00:00:00"
             }
         }

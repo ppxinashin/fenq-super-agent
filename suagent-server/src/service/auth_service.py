@@ -159,14 +159,17 @@ class AuthService:
                 return False
 
             # 从Redis中删除token
-            success = token_service.revoke_token(token)
+            revoke_status = token_service.revoke_token(token)
 
-            if success:
+            if revoke_status == 1:
                 logger.info(f"用户退出登录成功: {payload.get('username', 'unknown')}")
-            else:
-                logger.warning(f"用户退出登录部分失败 - token已过期或不存在: {payload.get('username', 'unknown')}")
-
-            return True  # 即使Redis中不存在也认为退出成功
+                return True
+            elif revoke_status == 0:
+                logger.info(f"用户退出登录成功 - token已过期: {payload.get('username', 'unknown')}")
+                return True
+            else:  # revoke_status == -1
+                logger.error(f"用户退出登录失败 - Redis连接异常: {payload.get('username', 'unknown')}")
+                return False
 
         except Exception as e:
             logger.error(f"用户退出登录异常: {e}")

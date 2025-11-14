@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from src.config.settings import settings
 from src.controller.auth_controller import router as auth_router
 from src.controller.user_manage_controller import router as user_manage_router
+from src.controller.agent_manage_controller import router as agent_manage_router
 from src.api_middlewares.exception_middleware import ExceptionMiddleware
 from src.utils.logger import get_logger
 import uvicorn
@@ -90,6 +91,7 @@ app.add_middleware(
 # 注册路由
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(user_manage_router, prefix="/api/v1")
+app.include_router(agent_manage_router, prefix="/api/v1")
 
 
 @app.get("/")

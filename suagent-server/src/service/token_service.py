@@ -157,7 +157,7 @@ class TokenService:
             logger.error(f"从Redis获取用户信息失败: {e}")
             return None
 
-    def revoke_token(self, token: str) -> bool:
+    def revoke_token(self, token: str) -> int:
         """
         撤销token（从Redis中删除）
 
@@ -165,11 +165,14 @@ class TokenService:
             token: 要撤销的token
 
         Returns:
-            是否成功撤销
+            撤销状态：
+            - 1: 成功撤销（token存在且已删除）
+            - 0: token不存在（可能已过期）
+            - -1: Redis连接失败或其他错误
         """
         if not self.redis_client:
             logger.warning("Redis未连接，无法撤销token")
-            return False
+            return -1
 
         try:
             redis_key = f"token:{token}"
@@ -177,14 +180,27 @@ class TokenService:
 
             if result > 0:
                 logger.info(f"Token已从Redis中撤销: {redis_key}")
-                return True
+                return 1
             else:
-                logger.warning(f"Redis中未找到要撤销的token: {redis_key}")
-                return False
+                logger.info(f"Redis中未找到token，可能已过期: {redis_key}")
+                return 0
 
         except Exception as e:
             logger.error(f"撤销token失败: {e}")
-            return False
+            return -1
+
+    def revoke_token_simple(self, token: str) -> bool:
+        """
+        撤销token的简化版本（向后兼容）
+
+        Args:
+            token: 要撤销的token
+
+        Returns:
+            是否成功撤销（成功或不存在都返回True）
+        """
+        result = self.revoke_token(token)
+        return result >= 0
 
     def refresh_token(self, token: str) -> Optional[str]:
         """

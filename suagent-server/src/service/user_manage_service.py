@@ -28,7 +28,7 @@ class UserManageService:
         self.user_crud = CRUDUser(User)
         self.snowflake = Snowflake(worker_id=1, datacenter_id=1)
 
-    def update_user(self, user_update: UserUpdateRequest) -> UserInfo:
+    def update_user(self, user_update: UserUpdateRequest, user_id: int, username: str) -> UserInfo:
         """
         修改用户信息
 
@@ -65,7 +65,7 @@ class UserManageService:
                 update_data["salt"] = salt
 
             # 更新用户信息
-            updated_user = self.user_crud.update_user_info(db, user_update.user_id, update_data)
+            updated_user = self.user_crud.update_user_info(db, user_update.user_id, update_data, updated_by=username)
             if not updated_user:
                 raise Exception("用户信息更新失败")
 
@@ -83,7 +83,7 @@ class UserManageService:
         finally:
             db.close()
 
-    def create_user(self, user_create: UserCreateRequest) -> UserInfo:
+    def create_user(self, user_create: UserCreateRequest, user_id: int, username: str) -> UserInfo:
         """
         创建新用户
 
@@ -116,7 +116,7 @@ class UserManageService:
                 username=user_data["username"],
                 plain_password=user_data["password"],
                 role=user_data["role"],
-                created_by="user_manage_api"
+                created_by=username
             )
             if not created_user:
                 raise Exception("用户创建失败")
@@ -208,7 +208,7 @@ class UserManageService:
         finally:
             db.close()
 
-    def delete_user(self, user_id: int) -> bool:
+    def delete_user(self, user_id: int, current_user_id: int, current_username: str) -> bool:
         """
         逻辑删除用户
 
@@ -233,7 +233,7 @@ class UserManageService:
                 raise Exception("用户已删除")
 
             # 逻辑删除用户
-            success = self.user_crud.soft_delete(db, user_id)
+            success = self.user_crud.soft_delete(db, user_id, deleted_by=current_username)
             if not success:
                 raise Exception("用户删除失败")
 
@@ -256,7 +256,9 @@ class UserManageService:
             role=user.role,
             is_deleted=user.is_deleted,
             created_at=user.created_at,
-            updated_at=user.updated_at
+            created_by=user.created_by,
+            updated_at=user.updated_at,
+            updated_by=user.updated_by
         )
 
     def _convert_to_user_list_item(self, user: User) -> UserListItem:
@@ -266,7 +268,8 @@ class UserManageService:
             username=user.username,
             role=user.role,
             is_deleted=user.is_deleted,
-            created_at=user.created_at
+            created_at=user.created_at,
+            created_by=user.created_by
         )
 
 

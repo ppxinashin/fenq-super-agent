@@ -4,7 +4,7 @@
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 
 class UserInfo(BaseModel):
@@ -15,7 +15,15 @@ class UserInfo(BaseModel):
     role: str = Field(..., description="用户角色")
     is_deleted: bool = Field(..., description="是否已删除")
     created_at: datetime = Field(..., description="创建时间")
+    created_by: Optional[str] = Field(default=None, description="创建人用户名")
     updated_at: Optional[datetime] = Field(default=None, description="更新时间")
+    updated_by: Optional[str] = Field(default=None, description="更新人用户名")
+
+    @field_serializer('created_at', 'updated_at')
+    def format_datetime(self, value: Optional[datetime]) -> Optional[str]:
+        if value is None:
+            return None
+        return value.strftime("%Y-%m-%d %H:%M:%S")
 
     class Config:
         populate_by_name = True
@@ -25,8 +33,8 @@ class UserInfo(BaseModel):
                 "username": "admin",
                 "role": "admin",
                 "is_deleted": False,
-                "created_at": "2024-01-01T00:00:00",
-                "updated_at": "2024-01-01T12:00:00"
+                "created_at": "2024-01-01 00:00:00",
+                "updated_at": "2024-01-01 12:00:00"
             }
         }
 
@@ -39,6 +47,13 @@ class UserListItem(BaseModel):
     role: str = Field(..., description="用户角色")
     is_deleted: bool = Field(..., description="是否已删除")
     created_at: datetime = Field(..., description="创建时间")
+    created_by: Optional[str] = Field(default=None, description="创建人用户名")
+
+    @field_serializer('created_at')
+    def format_datetime(self, value: Optional[datetime]) -> Optional[str]:
+        if value is None:
+            return None
+        return value.strftime("%Y-%m-%d %H:%M:%S")
 
     class Config:
         populate_by_name = True
@@ -48,6 +63,6 @@ class UserListItem(BaseModel):
                 "username": "admin",
                 "role": "admin",
                 "is_deleted": False,
-                "created_at": "2024-01-01T00:00:00"
+                "created_at": "2024-01-01 00:00:00"
             }
         }

@@ -4,7 +4,7 @@
 
 from .web_scraper import create_web_scraper_tool
 from .calculator import create_calculator_tool
-from .rag import create_rag_tool
+from .rag import create_rag_tool, create_long_memroy_tool
 from .file_opt import create_read_file_tool, create_write_file_tool
 from .terminal_opt import create_execute_command_tool
 from .web_search import create_web_search_tool
@@ -16,6 +16,7 @@ def all_tools():
         create_web_scraper_tool(),
         create_calculator_tool(),
         create_rag_tool(),
+        create_long_memroy_tool(),
         create_read_file_tool(),
         create_write_file_tool(),
         create_execute_command_tool(),
@@ -28,6 +29,7 @@ __all__ = [
     "create_web_scraper_tool",
     "create_calculator_tool",
     "create_rag_tool",
+    "create_long_memroy_tool",
     "create_read_file_tool",
     "create_write_file_tool",
     "create_execute_command_tool",
