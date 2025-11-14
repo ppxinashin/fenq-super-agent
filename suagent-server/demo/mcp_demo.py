@@ -1,7 +1,7 @@
 import asyncio
 
 from langchain_core.messages import HumanMessage
-from src.mcp import MyMCPClient
+from src.mcp_client import MyMCPClient
 from src.agents import MyAgent
 from langgraph.checkpoint.memory import InMemorySaver
 from src.memory import RedisShortMemory

@@ -3,19 +3,22 @@ FastAPI应用主入口
 """
 
 import datetime
+from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import json
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessageChunk, HumanMessage, ToolMessage
 from starlette.responses import StreamingResponse
 from src.config.settings import settings
 from src.controller.auth_controller import router as auth_router
 from src.controller.user_manage_controller import router as user_manage_router
 from src.controller.agent_manage_controller import router as agent_manage_router
+from src.controller.chat_controller import router as chat_router
 from src.api_middlewares.exception_middleware import ExceptionMiddleware
 from src.middlewares import get_my_logger_middleware
 from src.utils.logger import get_logger
+from src.tools import all_tools
 import uvicorn
 from src.agents import MyAgent
 from langchain_openai import ChatOpenAI
@@ -31,7 +34,8 @@ llm = ChatOpenAI(
 # 创建 Agent（create_agent 自动构建一个图）
 agent = MyAgent(
     llm=llm,
-    middlewares=[get_my_logger_middleware()]
+    middlewares=[get_my_logger_middleware()],
+    tools=all_tools()
 )
 
 logger = get_logger(__name__)
@@ -113,6 +117,8 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(user_manage_router, prefix="/api/v1")
 app.include_router(agent_manage_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")
+
 
 
 @app.get("/")
@@ -170,19 +176,24 @@ async def agent_stream(prompt: str):
 
     # astream = 异步流式输出
     async for event in agent.astream({"messages": [HumanMessage(content=prompt)]}):
-        data = json.dumps({"text": event[0].content}, ensure_ascii=False)
+        logger.info(f"Agent Event: {event}")
+        if isinstance(event[0], AIMessageChunk):
+            data = json.dumps({"text": event[0].content}, ensure_ascii=False)
+        elif isinstance(event[0], ToolMessage):
+            data = json.dumps({"text": f'> 已调用{event[0].name}\n\n'}, ensure_ascii=False)
+            
         yield f"data: {data}\n\n"
     
     yield "data: [DONE]\n\n"
 
 
 @app.get("/agent_health")
-async def agent_health():
+async def agent_health(m: str = "你好，这里是Fenq Super Agent，目前服务器已经启动，如果能够接收我的消息，请回复“收到”"):
     """
     智能体健康检测
     """
     return StreamingResponse(
-        agent_stream("你好，这里是Fenq Super Agent，目前服务器已经启动，如果能够接收我的消息，请回复“收到”"),
+        agent_stream(m),
         media_type="text/event-stream",
     )
 

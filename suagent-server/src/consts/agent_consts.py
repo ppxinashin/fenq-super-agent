@@ -30,16 +30,16 @@ class AgentConsts:
 
     # 工具列表（可用的工具集合）
     AVAILABLE_TOOLS = [
-        "web_scraper" # 网页抓取,
-        "calculator" # 计算器,
-        "rag" # RAG检索,
-        "long_memroy" # 长期记忆,
-        "read_file" # 读文件,
-        "write_file" # 写文件,
-        "execute_command" # 执行命令,
-        "web_search" # 网页搜索,
-        "downloader" # 文件下载,
-        "now_time" # 当前时间,
+        "web_scraper", # 网页抓取,
+        "calculator", # 计算器,
+        "rag", # RAG检索,
+        "long_memroy", # 长期记忆,
+        "read_file", # 读文件,
+        "write_file", # 写文件,
+        "execute_command", # 执行命令,
+        "web_search", # 网页搜索,
+        "downloader", # 文件下载,
+        "now_time", # 当前时间,
     ]
 
     # MCP状态
