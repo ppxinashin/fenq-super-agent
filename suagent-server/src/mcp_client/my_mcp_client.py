@@ -20,7 +20,7 @@ class MyMCPClient(MultiServerMCPClient):
                     server_config['transport'] = server_config.pop('type')
                 connections[server_name] = server_config
             self._logger.info(f"转换后的MCP服务器配置: {connections}")
-            super().__init__(connections=mcp_servers)
+            super().__init__(connections=connections)
         elif mcp_servers_file:    
             self._logger.info(f"MCP服务器配置文件: {mcp_servers_file}")
             with open(mcp_servers_file, "r") as f:
