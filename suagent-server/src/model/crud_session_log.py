@@ -348,6 +348,34 @@ class CRUDSessionLog(CRUDBase[SessionLog]):
             SessionLog.is_deleted == False
         ).distinct().count()
 
+    def get_by_username(
+        self,
+        db: Session,
+        username: str,
+        limit: Optional[int] = None
+    ) -> List[SessionLog]:
+        """
+        根据用户名获取所有会话日志（按时间升序）
+        注意：这里假设username就是user_id，通过created_by字段关联
+
+        Args:
+            db: 数据库会话
+            username: 用户名
+            limit: 限制返回数量（可选）
+
+        Returns:
+            会话日志列表
+        """
+        query = db.query(SessionLog).filter(
+            SessionLog.created_by == username,
+            SessionLog.is_deleted == False
+        ).order_by(SessionLog.created_at)
+
+        if limit:
+            query = query.limit(limit)
+
+        return query.all()
+
 
 # 创建全局CRUD实例
 crud_session_log = CRUDSessionLog(SessionLog)

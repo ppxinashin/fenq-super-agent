@@ -14,6 +14,7 @@ class UserInfo(BaseModel):
     role: str = Field(..., description="用户角色")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: Optional[datetime] = Field(None, description="更新时间")
+    memory_enabled: bool = Field(default=False, description="长期记忆开关状态")
 
     @field_serializer('created_at', 'updated_at')
     def format_datetime(self, value: Optional[datetime]) -> Optional[str]:
@@ -29,7 +30,8 @@ class UserInfo(BaseModel):
                 "username": "admin",
                 "role": "admin",
                 "created_at": "2024-01-01 00:00:00",
-                "updated_at": "2024-01-02 00:00:00"
+                "updated_at": "2024-01-02 00:00:00",
+                "memory_enabled": True
             }
         }
 

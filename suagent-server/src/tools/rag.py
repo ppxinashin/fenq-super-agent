@@ -12,7 +12,7 @@ from langchain_core.tools import create_retriever_tool
 
 @tool(response_format="content_and_artifact")
 def long_memroy(query: str, runtime: ToolRuntime[BaseContext]):
-    """检索长期记忆以帮助回答查询"""
+    """检索过往该用户与所有智能体的对话以帮助回答查询"""
     vector_store = PGVectorMemory.get_vectore_store("memory", str(runtime.context.user_id))
     retrieved_docs = vector_store.similarity_search(query, k=5)
     serialized = "\n\n".join(

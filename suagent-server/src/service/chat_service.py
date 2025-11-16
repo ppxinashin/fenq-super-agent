@@ -2,7 +2,9 @@ import json
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from langchain_core.messages import AIMessageChunk, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessageChunk, HumanMessage, ToolMessage, AIMessage
+from langchain_core.exceptions import LangChainException
+from openai import BadRequestError as OpenAIBadRequestError
 from src.agents import MyAgent
 from src.mcp_client import MyMCPClient
 from src.memory import RedisShortMemory
@@ -34,7 +36,7 @@ class ChatService:
         self.curd_session_log = CRUDSessionLog(SessionLog)
         self.id_generator = Snowflake(worker_id=1, datacenter_id=1)
 
-    async def _chat_agent(self, session_id: int, agent_id: str, user_id: str) -> MyAgent:
+    async def _chat_agent(self, session_id: int, agent_id: str, user_id: str, long_memory: bool = False) -> MyAgent:
         """
         创建聊天智能体
         
@@ -59,7 +61,12 @@ class ChatService:
             tools = await mcp.get_tools()
         
         for tool in agent_item.tools:
+            if tool == "long_memroy":
+                continue
             tools.append(create_tool(tool))
+            
+        if long_memory:
+            tools.append(create_tool("long_memroy"))
             
         return MyAgent(
             checkpointer = await RedisShortMemory.get_acheckpointer(),
@@ -71,7 +78,108 @@ class ChatService:
             user_id=user_id
         )
     
-    async def chat(self, session_id: int, agent_id: str, user_id: str, message: str):
+    async def _clean_checkpointer_thread(self, checkpointer, thread_id: str):
+        """
+        清理checkpointer中的线程历史
+        
+        Args:
+            checkpointer: checkpointer实例
+            thread_id: 线程ID
+        """
+        config = {"configurable": {"thread_id": thread_id}}
+        try:
+            await checkpointer.adelete(config)
+            logger.info(f"已清理checkpointer中的线程，thread_id={thread_id}")
+        except Exception as e:
+            logger.error(f"清理checkpointer线程失败: {e}", exc_info=True)
+    
+    async def _fix_incomplete_messages(self, checkpointer, thread_id: str):
+        """
+        修复checkpointer中不完整的消息历史
+        
+        如果发现带有tool_calls的AIMessage但没有对应的ToolMessage响应，
+        则删除整个线程的历史记录，以避免API调用错误
+        
+        Args:
+            checkpointer: checkpointer实例
+            thread_id: 线程ID
+        """
+        config = {"configurable": {"thread_id": thread_id}}
+        try:
+            # 获取当前的消息历史
+            state = await checkpointer.aget(config)
+            
+            if not state:
+                return
+            
+            # 检查state的格式，可能是dict或Checkpoint对象
+            messages = None
+            if isinstance(state, dict):
+                messages = state.get("messages") or state.get("channel_values", {}).get("messages")
+            elif hasattr(state, "channel_values"):
+                messages = state.channel_values.get("messages")
+            elif hasattr(state, "messages"):
+                messages = state.messages
+            
+            if not messages:
+                return
+            
+            has_incomplete_tool_calls = False
+            
+            # 检查是否有不完整的tool_calls
+            # 遍历所有消息，检查每个带有tool_calls的AIMessage是否有对应的ToolMessage
+            for i, msg in enumerate(messages):
+                if isinstance(msg, AIMessage):
+                    tool_calls = getattr(msg, 'tool_calls', None)
+                    if tool_calls:
+                        # 获取所有tool_call的ID
+                        tool_call_ids = {tc.get("id") for tc in tool_calls if tc.get("id")}
+                        if not tool_call_ids:
+                            continue
+                        
+                        found_tool_messages = set()
+                        
+                        # 向后查找对应的ToolMessage
+                        for j in range(i + 1, len(messages)):
+                            next_msg = messages[j]
+                            
+                            # 如果遇到下一个AIMessage或HumanMessage，停止查找
+                            # 因为这意味着当前轮次的tool_calls应该已经处理完了
+                            if isinstance(next_msg, (AIMessage, HumanMessage)):
+                                break
+                            
+                            # 检查是否是ToolMessage
+                            if isinstance(next_msg, ToolMessage):
+                                tool_msg_id = getattr(next_msg, 'tool_call_id', None)
+                                if tool_msg_id and tool_msg_id in tool_call_ids:
+                                    found_tool_messages.add(tool_msg_id)
+                        
+                        # 如果有未响应的tool_calls，说明不完整
+                        missing_tool_call_ids = tool_call_ids - found_tool_messages
+                        if missing_tool_call_ids:
+                            has_incomplete_tool_calls = True
+                            is_last = (i == len(messages) - 1)
+                            logger.warning(
+                                f"发现不完整的tool_calls（{'最后一条' if is_last else '中间'}消息），"
+                                f"thread_id={thread_id}, "
+                                f"消息索引={i}, "
+                                f"未响应的tool_call_ids={missing_tool_call_ids}, "
+                                f"总tool_calls数={len(tool_call_ids)}, "
+                                f"已响应数={len(found_tool_messages)}"
+                            )
+                            break  # 发现一个不完整的就足够了，直接清理
+            
+            # 如果发现不完整的tool_calls，清理整个线程
+            if has_incomplete_tool_calls:
+                logger.info(f"清理不完整的消息历史，thread_id={thread_id}")
+                await self._clean_checkpointer_thread(checkpointer, thread_id)
+                
+        except Exception as e:
+            logger.error(f"修复checkpointer消息失败: {e}", exc_info=True)
+            # 如果修复失败，尝试清理整个线程（作为最后手段）
+            await self._clean_checkpointer_thread(checkpointer, thread_id)
+    
+    async def chat(self, session_id: int, agent_id: str, user_id: str, message: str, long_memory: bool = False):
         """
         聊天
         
@@ -84,15 +192,74 @@ class ChatService:
         Returns:
             聊天流
         """
-        agent = await self._chat_agent(session_id, agent_id, user_id)
-        async for event in agent.astream({"messages": [HumanMessage(content=message)]}):
-            if isinstance(event[0], AIMessageChunk):
-                data = json.dumps({"text": event[0].content}, ensure_ascii=False)
-            elif isinstance(event[0], ToolMessage):
-                data = json.dumps({"text": f'> 已调用工具：{event[0].name}\n\n'}, ensure_ascii=False)
-            yield f"data: {data}\n\n"
+        agent = await self._chat_agent(session_id, agent_id, user_id, long_memory)
         
-        yield "data: [DONE]\n\n"
+        # 在调用agent之前，修复checkpointer中可能的不完整消息
+        checkpointer = await RedisShortMemory.get_acheckpointer()
+        thread_id = f'{agent_id}_{session_id}'
+        await self._fix_incomplete_messages(checkpointer, thread_id)
+        
+        max_retries = 2
+        retry_count = 0
+        
+        while retry_count <= max_retries:
+            try:
+                # 在每次尝试前，先修复可能的不完整消息
+                await self._fix_incomplete_messages(checkpointer, thread_id)
+                
+                async for event in agent.astream({"messages": [HumanMessage(content=message)]}):
+                    data = None
+                    if isinstance(event, (list, tuple)) and len(event) > 0:
+                        msg = event[0]
+                        if isinstance(msg, AIMessageChunk):
+                            data = json.dumps({"text": msg.content}, ensure_ascii=False)
+                        elif isinstance(msg, ToolMessage):
+                            tool_name = getattr(msg, 'name', '未知工具')
+                            data = json.dumps({"text": f'> 已调用工具：{tool_name}\n\n'}, ensure_ascii=False)
+                    
+                    if data:
+                        yield f"data: {data}\n\n"
+                
+                yield "data: [DONE]\n\n"
+                break  # 成功执行，退出重试循环
+                
+            except (OpenAIBadRequestError, LangChainException, Exception) as e:
+                error_message = str(e)
+                error_type = type(e).__name__
+                
+                # 检查是否是tool_calls相关的错误（更宽泛的匹配）
+                is_tool_calls_error = (
+                    "tool_calls" in error_message.lower() or
+                    "tool_call" in error_message.lower() or
+                    "tool message" in error_message.lower() or
+                    "must be followed by tool" in error_message.lower()
+                )
+                
+                if is_tool_calls_error:
+                    retry_count += 1
+                    logger.warning(
+                        f"检测到tool_calls相关错误 ({error_type})，清理线程并重试 (第{retry_count}次): "
+                        f"thread_id={thread_id}, error={error_message[:500]}"
+                    )
+                    
+                    # 强制清理线程，确保没有残留的不完整消息
+                    await self._clean_checkpointer_thread(checkpointer, thread_id)
+                    
+                    # 再次修复（虽然已经清理，但确保状态一致）
+                    await self._fix_incomplete_messages(checkpointer, thread_id)
+                    
+                    if retry_count <= max_retries:
+                        # 重新创建agent以确保使用清理后的checkpointer
+                        agent = await self._chat_agent(session_id, agent_id, user_id, long_memory)
+                    else:
+                        logger.error(f"重试{max_retries}次后仍然失败 ({error_type}): {error_message[:500]}")
+                        yield f"data: {json.dumps({'text': '<p style=\"color: red;\">**对话失败，请重试**</p>'}, ensure_ascii=False)}\n\n"
+                        yield "data: [DONE]\n\n"
+                        break
+                else:
+                    # 其他类型的错误，直接抛出
+                    logger.error(f"聊天过程中发生未预期的错误 ({error_type}): {error_message}", exc_info=True)
+                    raise
 
     def create_session(self, agent_id: str, user_id: str) -> CreateSessionResponse:
         """
@@ -411,12 +578,18 @@ class ChatService:
             title = ""
             
             async for event in agent.astream({"messages": [HumanMessage(content=content)]}):
-                if isinstance(event[0], AIMessageChunk):
-                    data = json.dumps({"text": event[0].content}, ensure_ascii=False)
-                    title += event[0].content
-                elif isinstance(event[0], ToolMessage):
-                    data = json.dumps({"text": f'> 已调用工具：{event[0].name}\n\n'}, ensure_ascii=False)
-                yield f"data: {data}\n\n"
+                data = None
+                if isinstance(event, (list, tuple)) and len(event) > 0:
+                    msg = event[0]
+                    if isinstance(msg, AIMessageChunk):
+                        data = json.dumps({"text": msg.content}, ensure_ascii=False)
+                        title += msg.content
+                    elif isinstance(msg, ToolMessage):
+                        tool_name = getattr(msg, 'name', '未知工具')
+                        data = json.dumps({"text": f'> 已调用工具：{tool_name}\n\n'}, ensure_ascii=False)
+                
+                if data:
+                    yield f"data: {data}\n\n"
             
             self.update_session_title(session_id=session_id, title=title, user_id=user_id)
         yield "data: [DONE]\n\n"

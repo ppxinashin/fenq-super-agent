@@ -7,12 +7,15 @@ from typing import Dict, Any
 from src.api_middlewares.role_middleware import require_admin
 from src.api_middlewares.jwt_middleware import get_current_user_from_token
 from src.service.user_manage_service import user_manage_service
+from src.service.memory_setting_service import memory_setting_service
 from src.request.user_manage_request import UserUpdateRequest, UserCreateRequest, UserListRequest
 from src.request.base_request import BaseIDRequest
+from src.request.memory_setting_request import MemorySettingRequest
 from src.response.base_response import ApiResponse, success_response, error_response, business_error_response
 from src.response.user_manage_response import UserInfo, UserListItem
 from src.response.auth_response import UserInfo as AuthUserInfo
 from src.response.pageable import Pageable
+from src.response.memory_setting_response import MemorySettingResponse
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -147,4 +150,73 @@ async def delete_user(request: Request, user_id: int, current_user: AuthUserInfo
 
     except Exception as e:
         logger.error(f"删除用户失败: {e}")
+        return business_error_response(str(e))
+
+
+@router.post("/memory-setting", response_model=ApiResponse[MemorySettingResponse], summary="设置长期记忆开关")
+async def set_memory_setting(
+    request: Request,
+    memory_request: MemorySettingRequest,
+    current_user: AuthUserInfo = Depends(get_current_user_from_token)
+):
+    """
+    用户设置长期记忆开关
+
+    功能点：
+    - 用户可设置记忆开关状态
+    - 状态持久化存储到 user_memory_settings 表
+    - 查到了就修改状态，没查到就添加一个记录
+    - 开启开关后，异步上传聊天记录到MinIO
+    """
+    try:
+        logger.info(f"用户设置记忆开关: username={current_user.username}, enabled={memory_request.enabled}")
+
+        success = memory_setting_service.set_memory_setting(
+            username=current_user.username,
+            enabled=memory_request.enabled
+        )
+
+        if not success:
+            return business_error_response("设置记忆开关失败")
+
+        response = MemorySettingResponse(
+            username=current_user.username,
+            enabled=memory_request.enabled,
+            message=f"记忆开关已{'开启' if memory_request.enabled else '关闭'}"
+        )
+
+        return success_response(
+            result=response,
+            message="记忆开关设置成功"
+        )
+
+    except Exception as e:
+        logger.error(f"设置记忆开关失败: {e}")
+        return business_error_response(str(e))
+
+
+@router.get("/memory-setting", response_model=ApiResponse[bool], summary="查询长期记忆状态")
+async def get_memory_setting(
+    request: Request,
+    current_user: AuthUserInfo = Depends(get_current_user_from_token)
+):
+    """
+    用户查询长期记忆状态
+
+    功能点：
+    - 查询当前用户的长期记忆开关状态
+    - 如果没有查到就是关闭状态
+    """
+    try:
+        logger.info(f"用户查询记忆状态: username={current_user.username}")
+
+        memory_enabled = memory_setting_service.get_memory_status(current_user.username)
+
+        return success_response(
+            result=memory_enabled,
+            message="查询记忆状态成功"
+        )
+
+    except Exception as e:
+        logger.error(f"查询记忆状态失败: {e}")
         return business_error_response(str(e))

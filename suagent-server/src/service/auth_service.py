@@ -5,6 +5,7 @@
 from typing import Optional
 from sqlalchemy.orm import Session
 from src.model.crud_user import crud_user
+from src.model.crud_user_memory_setting import crud_user_memory_setting
 from src.model.user import UserRole
 from src.request.auth_request import RegisterRequest, LoginRequest, ChangePasswordRequest
 from src.response.auth_response import LoginResponse, RegisterResponse, UserInfo, ChangePasswordResponse
@@ -251,6 +252,9 @@ class AuthService:
             if not user:
                 return None
 
+            # 获取用户记忆开关状态
+            memory_enabled = crud_user_memory_setting.is_enabled(db=db, username=user.username)
+
             # 构建用户信息响应
             # 处理 role 可能是字符串或枚举对象的情况
             role_value = user.role.value if hasattr(user.role, 'value') else user.role
@@ -259,7 +263,8 @@ class AuthService:
                 username=user.username,
                 role=role_value,
                 created_at=user.created_at,
-                updated_at=user.updated_at
+                updated_at=user.updated_at,
+                memory_enabled=memory_enabled
             )
 
         except Exception as e:

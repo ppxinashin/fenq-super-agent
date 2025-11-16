@@ -51,7 +51,7 @@ async def chat(
         logger.info(f"用户开始聊天: user_id={current_user.username}, agent_id={agent_id}, session_id={session_id}")
 
         return StreamingResponse(
-            chat_service.chat(session_id, agent_id, message=message, user_id=current_user.username),
+            chat_service.chat(session_id, agent_id, message=message, user_id=current_user.username, long_memory=current_user.memory_enabled),
             media_type="text/event-stream",
         )
     except Exception as e:

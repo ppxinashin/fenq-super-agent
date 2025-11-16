@@ -1,4 +1,4 @@
-from langchain_text_splitters.markdown import MarkdownTextSplitter
+from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 from src.rag.chunker import Chunker
 from src.utils import get_logger
 
@@ -42,10 +42,14 @@ class MarkdownChunker(Chunker):
     
     def chunk(self, data: bytes) -> list[str]:
         """将Markdown文档内容分块"""
-        splitter = MarkdownTextSplitter(
+        separators = ["**user**", "**assistant**","\n\n", "\n", " ", "", "。", "！", "？", ".", "!", "?", "；", ";", "，", ","]
+        separators.extend(RecursiveCharacterTextSplitter.get_separators_for_language(Language.MARKDOWN))
+        splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
-            chunk_overlap=200
+            chunk_overlap=200,
+            separators=separators
         )
+        
         return splitter.split_text(self._parse(data))
 
 
