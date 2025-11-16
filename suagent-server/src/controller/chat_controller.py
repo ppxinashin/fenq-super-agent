@@ -103,9 +103,10 @@ async def generate_session_title(
     try:
         logger.info(f"用户生成会话标题: user_id={current_user.username}, session_id={session_id}")
 
-        result = chat_service.generate_title(session_id, current_user.username)
-
-        return success_response(result=result, message="标题生成成功")
+        return StreamingResponse(
+            chat_service.generate_title(session_id, user_id=current_user.username),
+            media_type="text/event-stream",
+        )
     except Exception as e:
         logger.error(f"生成标题失败: {e}")
         return business_error_response(f"生成标题失败: {str(e)}")
@@ -199,11 +200,10 @@ async def get_sessions(
         )
 
         pageable_response = Pageable(
-            items=result["items"],
+            data=result["items"],
             total=result["total"],
             page=result["page"],
             page_size=result["page_size"],
-            total_pages=result["total_pages"]
         )
 
         return success_response(result=pageable_response, message="会话列表查询成功")

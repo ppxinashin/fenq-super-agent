@@ -57,10 +57,9 @@ class ChatService:
         if agent_item.mcp_status:
             mcp = MyMCPClient(mcp_servers=json.loads(agent_item.mcp_config.replace("'",'"')))
             tools = await mcp.get_tools()
-            
-        else:
-            for tool in agent_item.tools:
-                tools.append(create_tool(tool))
+        
+        for tool in agent_item.tools:
+            tools.append(create_tool(tool))
             
         return MyAgent(
             checkpointer = await RedisShortMemory.get_acheckpointer(),
@@ -241,8 +240,11 @@ class ChatService:
             skip = (page - 1) * page_size
 
             # 查询会话列表
-            if keyword:
+            logger.info(f"查询参数: keyword='{keyword}', agent_id='{agent_id}', user_id='{user_id}'")
+
+            if keyword and keyword.strip():
                 # 按标题搜索
+                logger.info("执行按标题搜索分支")
                 sessions = self.curd_session.search_by_title(
                     db=db,
                     keyword=keyword,
@@ -252,8 +254,9 @@ class ChatService:
                 # 过滤用户的会话
                 sessions = [s for s in sessions if s.created_by == user_id]
                 total = len(sessions)
-            elif agent_id:
+            elif agent_id and agent_id.strip():
                 # 按智能体ID查询
+                logger.info("执行按智能体ID查询分支")
                 sessions = self.curd_session.get_by_agent_and_user(
                     db=db,
                     agent_id=agent_id,
@@ -263,7 +266,8 @@ class ChatService:
                 )
                 total = self.curd_session.count_by_agent_and_user(db, agent_id, user_id)
             else:
-                # 获取用户所有会话（这里需要在基础CRUD中添加方法）
+                # 获取用户所有会话
+                logger.info("执行获取用户所有会话分支")
                 query = db.query(Session).filter(
                     Session.created_by == user_id,
                     Session.is_deleted == False
@@ -279,7 +283,7 @@ class ChatService:
             for session in sessions:
                 # 获取智能体名称
                 agent_item = agent_manage_service.get_agent_by_id(session.agent_id)
-                agent_name = agent_item.name if agent_item else session.agent_id
+                agent_name = agent_item.agent_name
 
                 # 获取消息数量和最后消息时间
                 message_count = self.curd_session_log.count_by_session_id(db, session.session_id)
@@ -375,7 +379,7 @@ class ChatService:
         finally:
             db.close()
         
-    def generate_title(self, session_id: int, user_id: str):
+    async def generate_title(self, session_id: int, user_id: str):
         """
         生成标题
         
@@ -384,33 +388,40 @@ class ChatService:
             user_id: 用户ID
             
         Returns:
-            标题
+            标题流
         """
         db = next(get_db())
-        session_logs = self.curd_session_log.get_by_session_id(db, session_id)
-        if not len(session_logs):
-            raise ValueError(f"Session Log {session_id} not found")
+        session = self.curd_session.get_by_session_id(db, session_id=session_id)
+        if session.title:
+            data = json.dumps({"text": session.title}, ensure_ascii=False)
+            yield f"data: {data}\n\n"
+        else:
+            session_logs = self.curd_session_log.get_by_session_id(db, session_id, limit=2)
+            if not len(session_logs):
+                raise ValueError(f"Session Log {session_id} not found")
         
-        contents = '\n\n'.join([f'{session.role}: {session.content}' for session in session_logs])
-
-        system_prompt = f"你是一个标题助手，我要给你一段话，请你根据这段话生成一个标题，不超过20字\n\n这段话是：{contents}\n\n请直接返回标题，不要有其他内容。"
+            system_prompt = "你是一个标题助手，我要给你一段话，请你根据这段话生成一个标题，不超过20字"
+            content = f"请总结以下内容：\n\n{'\n\n'.join([f'{session.role}: {session.content}' for session in session_logs])}"
+            agent = MyAgent(
+                checkpointer=await RedisShortMemory.get_acheckpointer(),
+                middlewares=[get_my_logger_middleware()],
+                system_prompt=system_prompt,
+            )
+            
+            title = ""
+            
+            async for event in agent.astream({"messages": [HumanMessage(content=content)]}):
+                if isinstance(event[0], AIMessageChunk):
+                    data = json.dumps({"text": event[0].content}, ensure_ascii=False)
+                    title += event[0].content
+                elif isinstance(event[0], ToolMessage):
+                    data = json.dumps({"text": f'> 已调用工具：{event[0].name}\n\n'}, ensure_ascii=False)
+                yield f"data: {data}\n\n"
+            
+            self.update_session_title(session_id=session_id, title=title, user_id=user_id)
+        yield "data: [DONE]\n\n"
+            
         
-        agent = MyAgent(
-            checkpointer=RedisShortMemory.get_checkpointer(),
-            middlewares=[get_my_logger_middleware()],
-            system_prompt=system_prompt,
-        )
-        
-        response = agent.invoke({"messages": [HumanMessage(content=contents)]})
-        title = response.get("content", "")[:20]
-        
-        session = self.curd_session.get_by_session_id(db, session_id)
-        if not session:
-            raise ValueError(f"Session {session_id} not found")
-        
-        self.curd_session.update(db, db_obj=session, obj_in={"title": title}, updated_by=user_id)
-        
-        return ChatTitleResponse(title=title)
     
 
 chat_service = ChatService()
