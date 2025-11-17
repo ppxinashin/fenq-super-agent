@@ -219,8 +219,8 @@ class CRUDUser(CRUDBase[User]):
         Returns:
             创建的用户对象
         """
-        # 如果传入的数据中没有password_hash但有password，则进行哈希处理
-        if "password" in obj_in and "password_hash" not in obj_in:
+        # 如果传入的数据中没有salt，说明密码还未加密，需要进行哈希处理
+        if "password" in obj_in and "salt" not in obj_in:
             salt = User.generate_salt()
             password = User.hash_password(obj_in["password"], salt)
             obj_in["password"] = password
