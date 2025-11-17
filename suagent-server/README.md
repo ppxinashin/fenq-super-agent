@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Fenq Super Agent](https://img.shields.io/badge/Fenq-Super%20Agent-blue?style=for-the-badge)
+![Fenq Super Agent](https://img.shields.io/badge/AUTHOR-JEHOL%20FENQ-blue?style=for-the-badge)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.120.3-green?style=for-the-badge)
 ![LangChain](https://img.shields.io/badge/LangChain-1.0.3-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
