@@ -8,10 +8,10 @@ from src.api_middlewares.role_middleware import require_roles
 from src.api_middlewares.jwt_middleware import get_current_user_from_token
 from src.consts import StatusCode
 from src.service.file_manage_service import file_manage_service
-from src.request.file_manage_request import FileListRequest, FileChunksRequest, FileDeleteRequest
+from src.request.file_manage_request import FileListRequest, FileChunksRequest, FileDeleteRequest, FileBatchDeleteRequest
 from src.response.base_response import ApiResponse, success_response, business_error_response
 from src.response.file_manage_response import (
-    FileUploadResponse, FileListResponse, FileChunksResponse, FileDeleteResponse
+    FileUploadResponse, FileListResponse, FileChunksResponse, FileDeleteResponse, FileBatchDeleteResponse
 )
 from src.response.auth_response import UserInfo
 from src.consts.user_consts import UserConsts
@@ -42,6 +42,10 @@ async def upload_file(
     """
     try:
         logger.info(f"用户上传文件: user={current_user.username}, agent_id={agent_id}, filename={file.filename}")
+
+        # 检查文件名
+        if not file.filename:
+            return business_error_response("文件名不能为空")
 
         # 读取文件数据
         file_data = await file.read()
@@ -176,4 +180,52 @@ async def delete_file(
     except Exception as e:
         logger.error(f"删除文件失败: {e}")
         return business_error_response(f"删除文件失败: {str(e)}")
+
+
+@router.post("/files/batch-delete", response_model=ApiResponse[FileBatchDeleteResponse], summary="批量删除文件")
+@require_roles([UserConsts.USER_ROLE_ADMIN, UserConsts.USER_ROLE_USER])
+async def batch_delete_files(
+    request: Request,
+    delete_request: FileBatchDeleteRequest,
+    current_user: UserInfo = Depends(get_current_user_from_token)
+):
+    """
+    批量删除知识库文件
+
+    功能点：
+    - 批量删除 MinIO 中的文件
+    - 向量库的清理由桶监听服务处理
+    - 返回每个文件的删除结果
+
+    权限控制：
+    - 用户只能删除自己的文件
+    """
+    try:
+        logger.info(f"用户批量删除文件: user={current_user.username}, agent_id={delete_request.agent_id}, count={len(delete_request.sources)}")
+
+        # 构建完整的文件路径列表
+        full_sources = [
+            f"{delete_request.agent_id}/{current_user.username}/{source}"
+            for source in delete_request.sources
+        ]
+
+        result = file_manage_service.batch_delete_files(
+            agent_id=delete_request.agent_id,
+            username=current_user.username,
+            sources=full_sources
+        )
+
+        # 根据结果返回不同的消息
+        if result.failed_count == 0:
+            message = f"批量删除成功，共删除 {result.success_count} 个文件"
+        elif result.success_count == 0:
+            message = f"批量删除失败，{result.failed_count} 个文件删除失败"
+        else:
+            message = f"批量删除完成，成功 {result.success_count} 个，失败 {result.failed_count} 个"
+
+        return success_response(result=result, message=message)
+
+    except Exception as e:
+        logger.error(f"批量删除文件失败: {e}")
+        return business_error_response(f"批量删除文件失败: {str(e)}")
 

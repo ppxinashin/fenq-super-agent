@@ -11,7 +11,8 @@ from src.minio_client.my_minio import MyMinio
 from src.memory.pg_vector_memory import PGVectorMemory
 from src.response.file_manage_response import (
     FileUploadResponse, FileInfo, FileListResponse,
-    FileChunksResponse, ChunkInfo, FileDeleteResponse
+    FileChunksResponse, ChunkInfo, FileDeleteResponse,
+    FileBatchDeleteResponse, FileDeleteResult
 )
 from src.utils.logger import get_logger
 
@@ -251,6 +252,72 @@ class FileManageService:
         except Exception as e:
             logger.error(f"文件删除异常: {e}")
             raise
+
+    def batch_delete_files(
+        self,
+        agent_id: str,
+        username: str,
+        sources: list[str]
+    ) -> FileBatchDeleteResponse:
+        """
+        批量删除文件
+
+        Args:
+            agent_id: 智能体ID
+            username: 用户名
+            sources: 文件路径列表
+
+        Returns:
+            FileBatchDeleteResponse: 批量删除结果
+
+        Raises:
+            Exception: 删除失败时抛出异常
+        """
+        results = []
+        success_count = 0
+        failed_count = 0
+
+        logger.info(f"开始批量删除文件: agent_id={agent_id}, user={username}, count={len(sources)}")
+
+        for source in sources:
+            try:
+                # 删除单个文件
+                self.minio_client.remove_object(source)
+                
+                results.append(FileDeleteResult(
+                    source=source,
+                    success=True,
+                    message="删除成功"
+                ))
+                success_count += 1
+                logger.info(f"文件删除成功: {source}")
+
+            except S3Error as e:
+                results.append(FileDeleteResult(
+                    source=source,
+                    success=False,
+                    message=f"MinIO删除失败: {str(e)}"
+                ))
+                failed_count += 1
+                logger.error(f"文件删除失败 (MinIO): {source}, error={e}")
+
+            except Exception as e:
+                results.append(FileDeleteResult(
+                    source=source,
+                    success=False,
+                    message=f"删除异常: {str(e)}"
+                ))
+                failed_count += 1
+                logger.error(f"文件删除失败 (异常): {source}, error={e}")
+
+        logger.info(f"批量删除完成: total={len(sources)}, success={success_count}, failed={failed_count}")
+
+        return FileBatchDeleteResponse(
+            total=len(sources),
+            success_count=success_count,
+            failed_count=failed_count,
+            results=results
+        )
 
 
 # 创建服务实例

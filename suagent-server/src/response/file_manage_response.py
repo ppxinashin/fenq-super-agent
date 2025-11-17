@@ -56,3 +56,18 @@ class FileDeleteResponse(BaseModel):
     deleted: bool = Field(..., description="是否删除成功")
     message: str = Field(default="文件删除成功", description="消息")
 
+
+class FileDeleteResult(BaseModel):
+    """单个文件删除结果"""
+    source: str = Field(..., description="文件路径")
+    success: bool = Field(..., description="是否成功")
+    message: Optional[str] = Field(None, description="消息")
+
+
+class FileBatchDeleteResponse(BaseModel):
+    """批量删除响应"""
+    total: int = Field(..., description="总文件数")
+    success_count: int = Field(..., description="成功删除数量")
+    failed_count: int = Field(..., description="失败删除数量")
+    results: List[FileDeleteResult] = Field(default_factory=list, description="每个文件的删除结果")
+
