@@ -19,6 +19,18 @@ class MyMinio:
             secure=False
         )
         self.bucket = settings.minio_bucket
+        
+        # 确保bucket存在
+        self._ensure_bucket_exists()
+    
+    def _ensure_bucket_exists(self):
+        """确保bucket存在，不存在则创建"""
+        try:
+            if not self.client.bucket_exists(self.bucket):
+                self.client.make_bucket(self.bucket)
+        except Exception:
+            # 如果创建失败，忽略错误（可能已经存在或权限问题）
+            pass
     
     def bucket_exists(self) -> bool:
         """检查桶是否存在"""

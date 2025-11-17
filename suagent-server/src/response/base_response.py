@@ -147,7 +147,7 @@ def error_response(
     return ApiResponse.error(message=message, code=code)
 
 
-def business_error_response(message: str) -> ApiResponse:
+def business_error_response(message: str, code: int = StatusCode.BUSINESS_ERROR) -> ApiResponse:
     """
     创建业务错误响应（便捷方法）
     
@@ -157,5 +157,5 @@ def business_error_response(message: str) -> ApiResponse:
     Returns:
         ApiResponse对象，code=299
     """
-    return ApiResponse.error(message=message, code=StatusCode.BUSINESS_ERROR)
+    return ApiResponse.error(message=message, code=code)
 

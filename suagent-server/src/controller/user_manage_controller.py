@@ -220,3 +220,36 @@ async def get_memory_setting(
     except Exception as e:
         logger.error(f"查询记忆状态失败: {e}")
         return business_error_response(str(e))
+
+
+@router.post("/memory-sync", summary="手动同步长期记忆")
+async def sync_memory(
+    request: Request,
+    current_user: AuthUserInfo = Depends(get_current_user_from_token)
+):
+    """
+    用户手动同步长期记忆
+
+    功能点：
+    - 判断用户是否开启了长期记忆
+    - 如果开启了，异步执行记忆文档上传
+    - 如果没开启，返回299状态码提示用户
+    """
+    try:
+        logger.info(f"用户同步记忆: username={current_user.username}")
+
+        # 检查用户是否开启了长期记忆
+        if not current_user.memory_enabled:
+            return error_response("用户未开启长期记忆功能")
+
+        # 执行记忆同步
+        message = memory_setting_service.sync_memory(current_user.username)
+
+        return success_response(
+            result=True,
+            message=message
+        )
+
+    except Exception as e:
+        logger.error(f"同步记忆失败: {e}")
+        return business_error_response(str(e))
