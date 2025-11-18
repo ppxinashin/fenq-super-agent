@@ -1,17 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { FaRobot, FaPlus, FaUser, FaKey, FaBrain, FaSignOutAlt, FaBars, FaTimes, FaSync } from 'react-icons/fa'
 import ConfirmModal from './ConfirmModal'
 import { toast } from 'react-hot-toast'
+import { useAuth } from '../contexts/AuthContext'
+import { getAvatarText, generateAvatarGradient } from '../utils/avatarHelper'
+import { AuthAPI, UsersAPI } from '../api'
 
-interface HeaderProps {
-  userRole?: 'admin' | 'user'
-  username?: string
-}
-
-export default function Header({ userRole = 'admin', username = 'U' }: HeaderProps) {
+export default function Header() {
+  const { user, logout, isAuthenticated } = useAuth()
+  const username = user?.username || 'User'
+  const userRole = user?.role || 'user'
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
@@ -28,6 +29,25 @@ export default function Header({ userRole = 'admin', username = 'U' }: HeaderPro
   const router = useRouter()
   const pathname = usePathname()
 
+  // 加载长期记忆设置
+  useEffect(() => {
+    const loadMemorySetting = async () => {
+      try {
+        const response = await UsersAPI.getMemorySetting()
+        if (response.code === 200) {
+          setLongTermMemory(response.result)
+        }
+      } catch (error) {
+        console.error('加载记忆设置失败:', error)
+      }
+    }
+
+    // 只有在用户已登录时才加载设置
+    if (isAuthenticated) {
+      loadMemorySetting()
+    }
+  }, [isAuthenticated])
+
   const tabs = [
     { name: '智能体市场', href: '/market', alwaysShow: true },
     { name: '智能体管理', href: '/agents', alwaysShow: true },
@@ -43,7 +63,24 @@ export default function Header({ userRole = 'admin', username = 'U' }: HeaderPro
     setShowLogoutModal(true)
   }
 
-  const confirmLogout = () => {
+  const confirmLogout = async () => {
+    try {
+      // 调用登出API
+      const logoutResponse = await AuthAPI.logout()
+
+      // 检查API响应
+      if (logoutResponse.code === 200) {
+        console.log('服务器登出成功:', logoutResponse.message)
+      } else {
+        console.warn('服务器登出响应异常:', logoutResponse.message)
+      }
+    } catch (error) {
+      console.error('Logout API error:', error)
+      // 即使API调用失败，也继续本地登出
+    }
+
+    // 本地登出 - 清除sessionStorage和AuthContext状态
+    logout()
     toast.success('退出登录成功')
     setShowUserMenu(false)
     setShowLogoutModal(false)
@@ -62,7 +99,7 @@ export default function Header({ userRole = 'admin', username = 'U' }: HeaderPro
     }))
   }
 
-  const handlePasswordChange = (e: React.FormEvent) => {
+  const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // 验证所有字段都已填写
@@ -97,19 +134,66 @@ export default function Header({ userRole = 'admin', username = 'U' }: HeaderPro
       return
     }
 
-    // 这里应该调用实际的修改密码 API
-    toast.success('密码修改成功！')
-    setShowPasswordModal(false)
-    setShowUserMenu(false)
-    setPasswordData({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    })
+    // 调用修改密码 API
+    try {
+      const changePasswordResponse = await AuthAPI.changePassword({
+        old_password: passwordData.currentPassword,
+        new_password: passwordData.newPassword,
+        confirm_password: passwordData.confirmPassword
+      })
+
+      if (changePasswordResponse.code === 200) {
+        toast.success('密码修改成功！')
+        setShowPasswordModal(false)
+        setShowUserMenu(false)
+        setPasswordData({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        })
+      } else {
+        toast.error(changePasswordResponse.message || '密码修改失败！')
+      }
+    } catch (error: any) {
+      console.error('修改密码错误:', error)
+      const errorMessage = error.response?.data?.message || error.message || '密码修改失败！'
+      toast.error(errorMessage)
+    }
   }
 
-  const handleSyncMemory = () => {
-    toast.success('记忆同步完成！')
+  const handleMemoryToggle = async () => {
+    try {
+      const newSetting = !longTermMemory
+      const response = await UsersAPI.setMemorySetting({ enabled: newSetting })
+
+      if (response.code === 200) {
+        setLongTermMemory(newSetting)
+        toast.success(newSetting ? '长期记忆已开启' : '长期记忆已关闭')
+      } else {
+        toast.error(response.message || '设置记忆状态失败')
+      }
+    } catch (error: any) {
+      console.error('设置记忆状态错误:', error)
+      const errorMessage = error.response?.data?.message || error.message || '设置记忆状态失败'
+      toast.error(errorMessage)
+    }
+  }
+
+  const handleSyncMemory = async () => {
+    try {
+      const response = await UsersAPI.syncMemory()
+      if (response.code === 200) {
+        toast.success('记忆同步完成！')
+      } else if (response.code === 299) {
+        toast.warning('请先开启长期记忆功能')
+      } else {
+        toast.error(response.message || '记忆同步失败')
+      }
+    } catch (error: any) {
+      console.error('记忆同步错误:', error)
+      const errorMessage = error.response?.data?.message || error.message || '记忆同步失败'
+      toast.error(errorMessage)
+    }
     setShowUserMenu(false)
   }
 
@@ -177,16 +261,21 @@ export default function Header({ userRole = 'admin', username = 'U' }: HeaderPro
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="w-10 h-10 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center hover:ring-2 hover:ring-indigo-500 transition-all duration-200"
+                  className="w-10 h-10 rounded-full flex items-center justify-center hover:ring-2 hover:ring-indigo-500 transition-all duration-200 text-white font-bold text-sm border-2 border-white shadow-lg"
+                  style={{
+                    background: generateAvatarGradient(username),
+                    textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                  }}
                 >
-                  <span className="text-white font-semibold text-sm">{username}</span>
+                  {getAvatarText(username)}
                 </button>
 
                 {/* 用户下拉菜单 */}
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                     <div className="px-4 py-2 border-b border-gray-200">
-                      <p className="text-sm font-medium text-gray-900">用户设置</p>
+                      <p className="text-sm font-medium text-gray-900">{username}</p>
+                      <p className="text-xs text-gray-500 capitalize">{userRole === 'admin' ? '管理员' : '用户'}</p>
                     </div>
                     <button
                       onClick={() => {
@@ -205,7 +294,7 @@ export default function Header({ userRole = 'admin', username = 'U' }: HeaderPro
                       </div>
                       <button
                         type="button"
-                        onClick={() => setLongTermMemory(!longTermMemory)}
+                        onClick={handleMemoryToggle}
                         className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
                           longTermMemory ? 'bg-indigo-600' : 'bg-gray-200'
                         }`}

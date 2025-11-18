@@ -108,7 +108,7 @@ export default function KnowledgePage() {
   const [isUploading, setIsUploading] = useState(false) // 防止重复上传
   const [selectedFile, setSelectedFile] = useState<FileData | null>(null)
   const [showChunks, setShowChunks] = useState(false)
-  const [expandedChunks, setExpandedChunks] = useState<number[]>([])
+  const [expandedChunks, setExpandedChunks] = useState<string[]>([])
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteModalType, setDeleteModalType] = useState<'single' | 'batch'>('single')
   const [fileToDelete, setFileToDelete] = useState<number | null>(null)

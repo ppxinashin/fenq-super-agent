@@ -4,15 +4,18 @@ import { useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { FaUser, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
+import { AuthAPI } from '../../api'
+import { useAuth } from '../../contexts/AuthContext'
 
 export default function LoginPage() {
+  const { login } = useAuth()
   const [isLogin, setIsLogin] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [formData, setFormData] = useState({
-    username: 'newuser',
-    password: 'password123456',
-    confirmPassword: 'password123456'
+    username: '',
+    password: '',
+    confirmPassword: ''
   })
   const router = useRouter()
 
@@ -40,24 +43,50 @@ export default function LoginPage() {
     }
 
     try {
-      // 模拟登录/注册请求
       if (isLogin) {
-        // 这里应该是实际的登录 API 调用
-        console.log('登录信息:', { username: formData.username, password: formData.password })
-        toast.success('登录成功！')
-        setTimeout(() => {
-          router.push('/market')
-        }, 1000)
+        // 登录 API 调用
+        const loginResponse = await AuthAPI.login({
+          username: formData.username,
+          password: formData.password
+        });
+
+        if (loginResponse.code === 200 && loginResponse.result) {
+          // 使用AuthContext的login方法
+          login(loginResponse.result.access_token, loginResponse.result.user_info);
+
+          toast.success('登录成功！');
+          setTimeout(() => {
+            router.push('/market');
+          }, 1000);
+        } else {
+          toast.error(loginResponse.message || '登录失败！');
+        }
       } else {
-        // 这里应该是实际的注册 API 调用
-        console.log('注册信息:', formData)
-        toast.success('注册成功！')
-        setTimeout(() => {
-          router.push('/market')
-        }, 1000)
+        // 注册 API 调用
+        const registerResponse = await AuthAPI.register({
+          username: formData.username,
+          password: formData.password,
+          confirm_password: formData.confirmPassword
+        });
+
+        if (registerResponse.code === 200) {
+          toast.success('注册成功！请登录');
+          // 注册成功后切换到登录模式
+          setIsLogin(true);
+          // 清空密码字段
+          setFormData(prev => ({
+            ...prev,
+            password: '',
+            confirmPassword: ''
+          }));
+        } else {
+          toast.error(registerResponse.message || '注册失败！');
+        }
       }
-    } catch (error) {
-      toast.error(isLogin ? '登录失败！' : '注册失败！')
+    } catch (error: any) {
+      console.error(isLogin ? '登录错误:' : '注册错误:', error);
+      const errorMessage = error.response?.data?.message || error.message || (isLogin ? '登录失败！' : '注册失败！');
+      toast.error(errorMessage);
     }
   }
 

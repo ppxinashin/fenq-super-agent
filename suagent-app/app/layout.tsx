@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from 'react-hot-toast'
 import MobileRedirectProvider from '@/components/MobileRedirectProvider'
+import { AuthProvider } from '../contexts/AuthContext'
 
 const inter = Inter({
   subsets: ["latin"],
@@ -24,9 +25,11 @@ export default function RootLayout({
       <body
         className={`${inter.variable} font-sans antialiased`}
       >
-        <MobileRedirectProvider>
-          {children}
-        </MobileRedirectProvider>
+        <AuthProvider>
+          <MobileRedirectProvider>
+            {children}
+          </MobileRedirectProvider>
+        </AuthProvider>
         <Toaster
           position="bottom-center"
           gutter={16}
