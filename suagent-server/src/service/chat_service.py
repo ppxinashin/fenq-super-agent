@@ -57,7 +57,7 @@ class ChatService:
         
         # 异步踩坑 - 使用 astream() 时必须使用异步 checkpointer
         if agent_item.mcp_status:
-            mcp = MyMCPClient(mcp_servers=json.loads(agent_item.mcp_config.replace("'",'"')))
+            mcp = MyMCPClient(mcp_servers=json.loads(agent_item.mcp_config))
             tools = await mcp.get_tools()
         
         for tool in agent_item.tools:

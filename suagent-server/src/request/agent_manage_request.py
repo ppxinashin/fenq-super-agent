@@ -17,7 +17,7 @@ class AgentCreateRequest(BaseModel):
     system_prompt: str = Field(default=AgentConsts.DEFAULT_SYSTEM_PROMPT, description="系统提示词", max_length=AgentConsts.AGENT_SYSTEM_PROMPT_MAX_LENGTH)
     tools: List[str] = Field(default=[], description="可用工具列表")
     mcp_status: bool = Field(default=False, description="MCP状态")
-    mcp_config: Optional[str] = Field(default=None, description="MCP服务器配置（JSON字符串）")
+    mcp_config: Optional[str] = Field(default='{}', description="MCP服务器配置（JSON字符串）")
 
     @field_validator('agent_id')
     @classmethod
@@ -74,7 +74,7 @@ class AgentUpdateRequest(BaseModel):
     system_prompt: Optional[str] = Field(default=None, description="系统提示词", max_length=AgentConsts.AGENT_SYSTEM_PROMPT_MAX_LENGTH)
     tools: Optional[List[str]] = Field(default=None, description="可用工具列表")
     mcp_status: Optional[bool] = Field(default=None, description="MCP状态")
-    mcp_config: Optional[str] = Field(default=None, description="MCP服务器配置（JSON字符串）")
+    mcp_config: Optional[str] = Field(default='{}', description="MCP服务器配置（JSON字符串）")
 
     @field_validator('tools')
     @classmethod
@@ -107,7 +107,7 @@ class AgentUpdateRequest(BaseModel):
                 "system_prompt": "你是一个高级的网页分析专家。",
                 "tools": ["web_scraper", "web_search", "calculator"],
                 "mcp_status": True,
-                "mcp_config": '{"server": "mcp-server-1", "port": 3000}'
+                "mcp_config": '{"mcp-server-1": {"type":"sse", "url":"http://mcp.example.com/mcp"}}'
             }
         }
 
@@ -177,7 +177,7 @@ class AgentMcpUpdateRequest(BaseModel):
 
     agent_id: str = Field(..., description="智能体英文名")
     mcp_status: bool = Field(..., description="MCP状态")
-    mcp_config: Optional[str] = Field(default=None, description="MCP服务器配置（JSON字符串）")
+    mcp_config: Optional[str] = Field(default='{}', description="MCP服务器配置（JSON字符串）")
 
     @field_validator('mcp_config')
     @classmethod

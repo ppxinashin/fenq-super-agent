@@ -2,6 +2,7 @@
 智能体管理服务层
 """
 
+import json
 from typing import Optional, List
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -481,7 +482,7 @@ class AgentManageService:
             system_prompt=agent.system_prompt,
             tools=agent.tools or [],
             mcp_status=agent.mcp_enabled,
-            mcp_config=str(agent.mcp_servers) if agent.mcp_servers else None,
+            mcp_config=json.dumps(agent.mcp_servers, ensure_ascii=False) if agent.mcp_servers else None,
             creator_id=0,  # 由于没有单独的creator_id字段，暂时使用0
             creator_username=agent.created_by or "system",
             created_at=agent.created_at,

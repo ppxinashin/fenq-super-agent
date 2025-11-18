@@ -40,7 +40,7 @@ class AgentInfo(BaseModel):
                 "system_prompt": "你是一个专业的网页分析助手，能够抓取和分析网页内容。",
                 "tools": ["web_scraper", "web_search"],
                 "mcp_status": True,
-                "mcp_config": '{"server": "mcp-server-1", "port": 3000}',
+                "mcp_config": '{"mcp-server-1": {"type":"sse", "url":"http://mcp.example.com/mcp"}}',
                 "creator_id": 231073032568705024,
                 "creator_username": "admin",
                 "created_at": "2025-01-01 00:00:00",

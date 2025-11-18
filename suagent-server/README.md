@@ -5,7 +5,7 @@
 ![Fenq Super Agent](https://img.shields.io/badge/AUTHOR-JEHOL%20FENQ-blue?style=for-the-badge)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.120.3-green?style=for-the-badge)
 ![LangChain](https://img.shields.io/badge/LangChain-1.0.3-orange?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
+![License](https://img.shields.io/badge/License-Apache-yellow?style=for-the-badge)
 
 [API文档](http://localhost:8000/docs) • [在线演示](#) • [更新日志](CHANGELOG.md)
 
@@ -477,7 +477,7 @@ type(scope): description
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+本项目采用 Apache 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ## 🙏 致谢
 
@@ -489,34 +489,6 @@ type(scope): description
 - [Redis](https://redis.io/) - 内存数据结构存储
 - [MinIO](https://min.io/) - 高性能对象存储
 
-## 📞 联系我们
-
-- **项目主页**: https://github.com/your-username/fenq-super-agent
-- **问题反馈**: https://github.com/your-username/fenq-super-agent/issues
-- **邮箱**: your-email@example.com
-- **文档**: https://docs.fenq-super-agent.com
-
-## 🗺️ 路线图
-
-### v1.1 (计划中)
-- [ ] 智能体市场功能
-- [ ] 更多内置工具集成
-- [ ] 性能优化和监控
-- [ ] 多语言支持
-
-### v1.2 (规划中)
-- [ ] 图形化配置界面
-- [ ] 插件系统
-- [ ] 分布式部署支持
-- [ ] 高级分析功能
-
-### v2.0 (长期规划)
-- [ ] 多模态支持（图像、语音）
-- [ ] 移动端支持
-- [ ] 企业级功能
-- [ ] 云服务集成
-
----
 
 <div align="center">
 
