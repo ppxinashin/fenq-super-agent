@@ -2,11 +2,11 @@
 export interface ApiResponse<T = any> {
   code: number;
   message: string;
-  data: T;
+  result: T;
 }
 
 export interface Pageable<T> {
-  items: T[];
+  data: T[];
   total: number;
   page: number;
   page_size: number;
@@ -34,7 +34,7 @@ export interface LoginRequest {
 export interface LoginResponse {
   access_token: string;
   token_type: string;
-  user: UserInfo;
+  user_info: UserInfo;
 }
 
 export interface LogoutResponse {
@@ -59,7 +59,7 @@ export interface TokenValidationResponse {
 
 // User Types
 export interface UserInfo {
-  user_id: bigint;  // 使用 bigint 处理雪花号
+  id: bigint;  // 使用 bigint 处理雪花号
   username: string;
   role: string;
   is_deleted?: boolean;

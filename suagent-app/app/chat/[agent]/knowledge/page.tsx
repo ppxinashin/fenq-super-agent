@@ -126,8 +126,8 @@ export default function KnowledgePage() {
 
       if (response.code === 200) {
         // 根据API文档，数据在 response.data 中
-        const fileData = response.data || response.result
-        const fileList = fileData?.data || fileData?.files || []
+        const fileData = response.result
+        const fileList = fileData?.data || []
         const totalCount = fileData?.total || 0
         
         console.log('解析的文件列表:', fileList)

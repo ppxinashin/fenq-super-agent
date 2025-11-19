@@ -185,7 +185,10 @@ export default function Header() {
       if (response.code === 200) {
         toast.success('记忆同步完成！')
       } else if (response.code === 299) {
-        toast.warning('请先开启长期记忆功能')
+        toast('请先开启长期记忆功能', {
+          icon: '⚠️',
+          duration: 5000,
+        })
       } else {
         toast.error(response.message || '记忆同步失败')
       }
