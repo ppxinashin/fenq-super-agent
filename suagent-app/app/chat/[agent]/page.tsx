@@ -343,7 +343,6 @@ export default function ChatFrameworkPage() {
 
           {/* 功能菜单 */}
           <div className="p-4 border-b border-gray-200">
-            <h4 className="text-xs font-medium text-gray-500 uppercase mb-3">功能菜单</h4>
             <div className="space-y-1">
               <button
                 onClick={handleSwitchToChat}
@@ -371,8 +370,7 @@ export default function ChatFrameworkPage() {
           </div>
 
           {/* 历史会话 */}
-          <div className="flex-1 overflow-y-auto p-4">
-            <h4 className="text-xs font-medium text-gray-500 uppercase mb-3 sticky top-0 bg-white z-10 pb-2">历史会话</h4>
+          <div className="h-96 overflow-y-auto p-4 bg-white">
             {loadingSessions ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
