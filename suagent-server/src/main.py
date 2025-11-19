@@ -17,6 +17,7 @@ from src.controller.agent_manage_controller import router as agent_manage_router
 from src.controller.chat_controller import router as chat_router
 from src.controller.file_manage_controller import router as file_manage_router
 from src.api_middlewares.exception_middleware import ExceptionMiddleware
+from src.api_middlewares.path_middleware import PathNormalizeMiddleware
 from src.middlewares import get_my_logger_middleware
 from src.utils.logger import get_logger
 from src.tools import all_tools
@@ -102,17 +103,21 @@ app = FastAPI(
     redoc_url="/redoc" if settings.debug else None,
 )
 
-# 添加异常处理中间件（需要最先添加，以便捕获所有异常）
-app.add_middleware(ExceptionMiddleware)
+# 添加路径规范化中间件（最先添加，处理双斜杠等路径问题）
+app.add_middleware(PathNormalizeMiddleware)
 
-# 添加CORS中间件
+# 添加CORS中间件（需要在异常处理之前，因为FastAPI中间件是反向执行的）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 生产环境中应该设置具体的允许域名
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],  # 暴露所有响应头，确保CORS正常工作
 )
+
+# 添加异常处理中间件（需要最先添加，以便捕获所有异常）
+app.add_middleware(ExceptionMiddleware)
 
 # 注册路由
 app.include_router(auth_router, prefix="/api/v1")
