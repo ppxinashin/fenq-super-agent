@@ -4,20 +4,20 @@
 
 from typing import Optional
 from pydantic import BaseModel, Field
+from src.request.base_request import BasePageKeywordRequest
 
 
-class FileListRequest(BaseModel):
+class FileListRequest(BasePageKeywordRequest):
     """文件列表查询请求"""
     agent_id: str = Field(..., description="智能体ID")
-    page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=20, ge=1, le=100, description="每页数量")
 
     class Config:
         json_schema_extra = {
             "example": {
                 "agent_id": "my_agent",
                 "page": 1,
-                "page_size": 20
+                "page_size": 20,
+                "keyword": "文档"
             }
         }
 

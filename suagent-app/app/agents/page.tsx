@@ -9,59 +9,51 @@ import ConfirmModal from '@/components/ConfirmModal'
 import { FaRobot, FaEdit, FaTrash, FaSearch, FaPlus, FaComments, FaBullseye, FaBook, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import { toast } from 'react-hot-toast'
 import { isMobile } from '@/hooks/useMobileRedirect'
-
-interface Agent {
-  id: number
-  agentId: string
-  name: string
-  description: string
-  createdBy: string
-  createdAt: string
-  updatedBy: string
-  updatedAt: string
-}
+import { AgentsAPI, AgentListItem } from '@/api'
+import { generateAgentAvatarGradient, getAgentAvatarText } from '@/utils/avatarHelper'
 
 export default function AgentsPage() {
   const router = useRouter()
   const [isMobileView, setIsMobileView] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [pageSize, setPageSize] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [agentToDelete, setAgentToDelete] = useState<number | null>(null)
+  const [agentToDelete, setAgentToDelete] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [agents, setAgents] = useState<AgentListItem[]>([])
 
-  const [agents, setAgents] = useState<Agent[]>([
-    {
-      id: 1,
-      agentId: 'customer_service',
-      name: '客服助手',
-      description: '专业的在线客服智能助手，提供24小时服务支持',
-      createdBy: 'admin',
-      createdAt: '2024-01-20 10:30:00',
-      updatedBy: 'admin',
-      updatedAt: '2024-02-15 14:20:00'
-    },
-    {
-      id: 2,
-      agentId: 'data_analyst',
-      name: '数据分析专家',
-      description: '专业的数据分析智能助手，提供数据洞察和报告生成',
-      createdBy: 'user123',
-      createdAt: '2024-02-10 09:15:00',
-      updatedBy: 'user123',
-      updatedAt: '2024-02-20 16:45:00'
-    },
-    {
-      id: 3,
-      agentId: 'knowledge_base',
-      name: '知识库助手',
-      description: '企业知识库管理智能助手，提供知识检索和问答服务',
-      createdBy: 'moderator',
-      createdAt: '2024-03-05 11:45:00',
-      updatedBy: 'admin',
-      updatedAt: '2024-03-10 10:15:00'
+  // 加载智能体列表
+  const loadAgents = async (page: number = currentPage, keyword: string = searchTerm) => {
+    try {
+      setLoading(true)
+      const params: any = {
+        page,
+        page_size: pageSize
+      }
+      
+      if (keyword) {
+        params.keyword = keyword
+      }
+
+      const response = await AgentsAPI.getAgentManagementList(params)
+
+      if (response.code === 200 && response.result) {
+        setAgents(response.result.data || [])
+        setTotal(response.result.total || 0)
+        setCurrentPage(response.result.page || page)
+      } else {
+        toast.error(response.message || '加载智能体列表失败')
+      }
+    } catch (error: any) {
+      console.error('加载智能体列表错误:', error)
+      toast.error(error.response?.data?.message || '加载智能体列表失败')
+    } finally {
+      setLoading(false)
     }
-  ])
+  }
 
   useEffect(() => {
     // 检测移动端
@@ -77,45 +69,59 @@ export default function AgentsPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!isMobileView) {
+      loadAgents(1, '')
+    }
+  }, [isMobileView])
+
   // 如果是移动端，显示限制页面
   if (isMobileView) {
     return <MobileOnlyNotice />
   }
 
-  const filteredAgents = agents.filter(agent =>
-    agent.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  const paginatedAgents = filteredAgents.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  )
-
-  const totalPages = Math.ceil(filteredAgents.length / pageSize)
+  const totalPages = Math.ceil(total / pageSize)
 
   const handlePageSizeChange = (newPageSize: number) => {
     setPageSize(newPageSize)
     setCurrentPage(1)
+    loadAgents(1, searchTerm)
   }
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page)
+    loadAgents(page, searchTerm)
   }
 
-  const handleEditAgent = (agentId: number) => {
+  const handleSearch = () => {
+    setSearchTerm(searchInput)
+    loadAgents(1, searchInput)
+  }
+
+  const handleEditAgent = (agentId: string) => {
     router.push(`/agents/edit/${agentId}`)
   }
 
-  const handleDeleteAgent = (agentId: number, e: React.MouseEvent) => {
+  const handleDeleteAgent = (agentId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setAgentToDelete(agentId)
     setShowDeleteModal(true)
   }
 
-  const confirmDeleteAgent = () => {
+  const confirmDeleteAgent = async () => {
     if (agentToDelete) {
-      setAgents(prev => prev.filter(agent => agent.id !== agentToDelete))
-      toast.success('智能体删除成功')
+      try {
+        const response = await AgentsAPI.deleteAgent(agentToDelete)
+        
+        if (response.code === 200) {
+          toast.success('智能体删除成功')
+          await loadAgents(currentPage, searchTerm)
+        } else {
+          toast.error(response.message || '删除智能体失败')
+        }
+      } catch (error: any) {
+        console.error('删除智能体错误:', error)
+        toast.error(error.response?.data?.message || '删除智能体失败')
+      }
       setAgentToDelete(null)
     }
     setShowDeleteModal(false)
@@ -124,32 +130,6 @@ export default function AgentsPage() {
   const cancelDeleteAgent = () => {
     setAgentToDelete(null)
     setShowDeleteModal(false)
-  }
-
-  const getAgentIcon = (agentId: string) => {
-    switch (agentId) {
-      case 'customer_service':
-        return FaComments
-      case 'data_analyst':
-        return FaBullseye
-      case 'knowledge_base':
-        return FaBook
-      default:
-        return FaRobot
-    }
-  }
-
-  const getAgentIconColor = (agentId: string) => {
-    switch (agentId) {
-      case 'customer_service':
-        return 'bg-blue-100 text-blue-600'
-      case 'data_analyst':
-        return 'bg-green-100 text-green-600'
-      case 'knowledge_base':
-        return 'bg-purple-100 text-purple-600'
-      default:
-        return 'bg-gray-100 text-gray-600'
-    }
   }
 
   return (
@@ -169,17 +149,19 @@ export default function AgentsPage() {
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                  <div className="relative">
+                  <div className="flex items-stretch shadow-sm rounded-lg overflow-hidden">
                     <input
                       type="text"
                       placeholder="搜索智能体"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-4 pr-12 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                      className="pl-4 pr-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-purple-400 focus:shadow-lg transition-all duration-200 w-64 h-[38px] border-0"
                     />
                     <button
                       type="button"
-                      className="absolute right-2 top-1.5 p-1.5 text-gray-400 hover:text-purple-600 transition-colors duration-200"
+                      onClick={handleSearch}
+                      className="px-4 bg-white text-gray-600 hover:text-purple-600 hover:bg-gray-50 transition-all duration-200 h-[38px] flex items-center justify-center border-l border-gray-200"
                     >
                       <FaSearch />
                     </button>
@@ -224,53 +206,66 @@ export default function AgentsPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">智能体介绍</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建人</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">更新人</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">更新时间</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {paginatedAgents.map((agent, index) => {
-                    const Icon = getAgentIcon(agent.agentId)
-                    const iconColorClass = getAgentIconColor(agent.agentId)
-
-                    return (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center">
+                        <div className="flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mr-3"></div>
+                          <span className="text-gray-600">加载中...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : agents.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                        {searchTerm ? '没有找到匹配的智能体' : '暂无智能体数据'}
+                      </td>
+                    </tr>
+                  ) : (
+                    agents.map((agent, index) => (
                       <tr
-                        key={agent.id}
+                        key={agent.agent_id}
                         className="hover:bg-gray-50 transition-all duration-300 hover:shadow-md"
                       >
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{agent.id}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{agent.agentId}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{(currentPage - 1) * pageSize + index + 1}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{agent.agent_id}</td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center space-x-3">
-                            <div className={`w-8 h-8 ${iconColorClass.split(' ')[0]} rounded-full flex items-center justify-center transform transition-transform duration-300 hover:scale-110`}>
-                              <Icon className={`text-sm ${iconColorClass.split(' ')[1]}`} />
+                            <div 
+                              className="w-8 h-8 rounded-full flex items-center justify-center transform transition-transform duration-300 hover:scale-110 text-white text-xs font-bold"
+                              style={{ background: generateAgentAvatarGradient(agent.agent_id) }}
+                            >
+                              {getAgentAvatarText(agent.agent_name)}
                             </div>
-                            <span className="text-sm font-medium text-gray-900 hover:text-purple-600 transition-colors duration-200">{agent.name}</span>
+                            <span className="text-sm font-medium text-gray-900 hover:text-purple-600 transition-colors duration-200">{agent.agent_name}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{agent.description}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{agent.createdBy}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{agent.createdAt}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{agent.updatedBy}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{agent.updatedAt}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{agent.creator_username}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{agent.created_at ? new Date(agent.created_at).toLocaleString('zh-CN') : '-'}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{agent.updated_at ? new Date(agent.updated_at).toLocaleString('zh-CN') : '-'}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                           <button
-                            onClick={() => handleEditAgent(agent.id)}
+                            onClick={() => handleEditAgent(agent.agent_id)}
                             className="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-2 py-1 rounded mr-2 transition-all duration-200"
                           >
                             <FaEdit className="inline mr-1" /> 编辑
                           </button>
                           <button
-                            onClick={(e) => handleDeleteAgent(agent.id, e)}
+                            onClick={(e) => handleDeleteAgent(agent.agent_id, e)}
                             className="text-red-600 hover:text-red-900 hover:bg-red-50 px-2 py-1 rounded transition-all duration-200"
                           >
                             <FaTrash className="inline mr-1" /> 删除
                           </button>
                         </td>
                       </tr>
-                    )
-                  })}
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -279,7 +274,7 @@ export default function AgentsPage() {
             <div className="px-6 py-4 border-t border-gray-200 bg-white">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-500">
-                  显示 {(currentPage - 1) * pageSize + 1} 到 {Math.min(currentPage * pageSize, filteredAgents.length)} 条，共 {filteredAgents.length} 条记录
+                  显示 {total > 0 ? (currentPage - 1) * pageSize + 1 : 0} 到 {Math.min(currentPage * pageSize, total)} 条，共 {total} 条记录
                 </div>
                 <div className="flex items-center space-x-2">
                   <button

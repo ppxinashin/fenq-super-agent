@@ -6,13 +6,9 @@ import Header from '@/components/Header'
 import ConfirmModal from '@/components/ConfirmModal'
 import { FaArrowLeft, FaPlus, FaInfoCircle, FaCommentDots, FaCogs, FaCheck, FaEye, FaEyeSlash, FaTimes, FaQuestionCircle, FaRobot, FaSpinner } from 'react-icons/fa'
 import { toast } from 'react-hot-toast'
-
-interface ToolConfig {
-  id: string
-  name: string
-  description: string
-  enabled: boolean
-}
+import { AVAILABLE_TOOLS, getToolsList } from '@/utils/availableTools'
+import { AgentsAPI } from '@/api'
+import { validateMcpConfig } from '@/utils/mcpValidator'
 
 
 export default function CreateAgentPage() {
@@ -37,15 +33,7 @@ export default function CreateAgentPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [mcpConfig, setMcpConfig] = useState('')
-
-  const [tools, setTools] = useState<ToolConfig[]>([
-    { id: 'web_search', name: '网页搜索', description: '获取实时网络信息', enabled: true },
-    { id: 'calculator', name: '计算器', description: '进行数学计算', enabled: true },
-    { id: 'code_execution', name: '代码执行', description: '运行代码片段', enabled: false },
-    { id: 'file_processing', name: '文件处理', description: '读取和处理文件', enabled: false },
-    { id: 'image_generation', name: '图片生成', description: '根据描述生成图片', enabled: false },
-    { id: 'speech_to_text', name: '语音转文字', description: '处理语音输入', enabled: false }
-  ])
+  const [selectedTools, setSelectedTools] = useState<string[]>([]) // 选中的工具键名数组
 
   
   useEffect(() => {
@@ -60,13 +48,15 @@ export default function CreateAgentPage() {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [])
 
-  const handleToolToggle = (toolId: string) => {
-    setTools(prev => prev.map(tool =>
-      tool.id === toolId ? { ...tool, enabled: !tool.enabled } : tool
-    ))
+  const handleToolToggle = (toolKey: string) => {
+    setSelectedTools(prev => 
+      prev.includes(toolKey)
+        ? prev.filter(key => key !== toolKey)
+        : [...prev, toolKey]
+    )
   }
 
-  const handleCreateAgent = () => {
+  const handleCreateAgent = async () => {
     if (!agentName.trim() || !agentId.trim() || !agentDescription.trim() || !systemPrompt.trim()) {
       toast.error('请填写所有必填字段')
       return
@@ -77,13 +67,45 @@ export default function CreateAgentPage() {
       return
     }
 
+    if (agentId.toLowerCase() === 'memory') {
+      toast.error('智能体标识不能命名为 memory')
+      return
+    }
+
+    // 验证MCP配置格式
+    if (mcpEnabled && mcpConfig.trim() && mcpConfig.trim() !== '{}') {
+      const validation = validateMcpConfig(mcpConfig)
+      if (!validation.valid) {
+        toast.error(`MCP配置格式错误: ${validation.error}`)
+        return
+      }
+    }
+
     setIsCreating(true)
 
-    setTimeout(() => {
+    try {
+      const response = await AgentsAPI.createAgent({
+        agent_id: agentId.trim(),
+        agent_name: agentName.trim(),
+        description: agentDescription.trim(),
+        system_prompt: systemPrompt.trim(),
+        tools: selectedTools,
+        mcp_status: mcpEnabled,
+        mcp_config: mcpEnabled && mcpConfig.trim() ? mcpConfig.trim() : '{}'
+      })
+
+      if (response.code === 200) {
+        setShowSuccessModal(true)
+        toast.success('智能体创建成功！')
+      } else {
+        toast.error(response.message || '创建智能体失败')
+      }
+    } catch (error: any) {
+      console.error('创建智能体错误:', error)
+      toast.error(error.response?.data?.message || '创建智能体失败')
+    } finally {
       setIsCreating(false)
-      setShowSuccessModal(true)
-      toast.success('智能体创建成功！')
-    }, 2000)
+    }
   }
 
   const handleGoToChat = () => {
@@ -133,74 +155,80 @@ export default function CreateAgentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50">
       <Header/>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
-        {/* 页面标题 */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* 页面标题和返回按钮 */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center space-x-4">
             <button
               onClick={() => router.back()}
               className="text-gray-500 hover:text-gray-700 transition-colors"
             >
               <FaArrowLeft className="text-xl" />
             </button>
+            <h1 className="text-3xl font-bold text-gray-900">创建智能体</h1>
           </div>
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">创建 AI 智能体</h2>
-            <p className="text-gray-600">配置你的专属智能助手，定制其功能和行为</p>
+          <div className="flex items-center space-x-3">
+            <button
+              type="button"
+              onClick={handleCreateAgent}
+              disabled={isCreating}
+              className="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2 rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isCreating ? (
+                <>
+                  <FaSpinner className="animate-spin" />
+                  <span>创建中...</span>
+                </>
+              ) : (
+                <>
+                  <FaPlus />
+                  <span>创建</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
-        {/* 智能体图标预览 */}
-        <div className="flex justify-center mb-8">
-          <div className="w-24 h-24 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center">
-            <span className="text-white text-4xl font-bold">{getAgentIconPreview()}</span>
-          </div>
-        </div>
-
-        <form className="space-y-6">
-          {/* 基本信息 */}
-          <div className="bg-white rounded-xl p-6 border border-gray-200">
-            <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-              <FaInfoCircle className="text-indigo-500 mr-3" />
-              基本信息
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  智能体标识 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={agentId}
-                  onChange={(e) => setAgentId(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  placeholder="请输入智能体标识"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">智能体的唯一标识，只能包含字母、数字和下划线</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  智能体名称 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={agentName}
-                  onChange={(e) => setAgentName(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  placeholder="请输入智能体名称"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">智能体的显示名称，将在市场中展示</p>
-              </div>
+        {/* 表单内容 */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+          <div className="space-y-6">
+            {/* 智能体标识 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                智能体标识 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={agentId}
+                onChange={(e) => setAgentId(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="请输入智能体标识"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">智能体的唯一标识，只能包含字母、数字和下划线，不能命名为 memory</p>
             </div>
 
-            <div className="mt-6">
+            {/* 智能体名称 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                智能体名称 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="请输入智能体名称"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">智能体的显示名称，将在市场中展示</p>
+            </div>
+
+            {/* 智能体介绍 */}
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 智能体介绍 <span className="text-red-500">*</span>
               </label>
@@ -214,18 +242,11 @@ export default function CreateAgentPage() {
               />
               <p className="text-xs text-gray-500 mt-1">简要介绍智能体的主要功能和特点</p>
             </div>
-          </div>
 
-          {/* 系统提示词 */}
-          <div className="bg-white rounded-xl p-6 border border-gray-200">
-            <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-              <FaCommentDots className="text-indigo-500 mr-3" />
-              系统提示词
-            </h3>
-
+            {/* 系统提示词 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                设定描述 <span className="text-red-500">*</span> <span className="px-2 py-1 bg-indigo-100 text-indigo-600 rounded-full text-xs font-medium">重要</span>
+                系统提示词 <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={systemPrompt}
@@ -237,71 +258,63 @@ export default function CreateAgentPage() {
               />
               <p className="text-xs text-gray-500 mt-1">定义智能体的角色、能力和行为准则，这将影响智能体的回答风格和能力范围</p>
             </div>
-          </div>
 
-          {/* 高级设置 */}
-          <div className="bg-white rounded-xl p-6 border border-gray-200">
-            <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-              <FaCogs className="text-indigo-500 mr-3" />
-              高级设置
-            </h3>
-
-            <div className="space-y-6">
-              {/* 工具绑定区域 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-4">工具绑定</label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-60 overflow-y-auto pr-2">
-                  {tools.map((tool) => (
-                    <label
-                      key={tool.id}
-                      className={`flex items-center p-3 border rounded-xl cursor-pointer transition-all duration-300 ${
-                        tool.enabled ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-indigo-300'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={tool.enabled}
-                        onChange={() => handleToolToggle(tool.id)}
-                        className="mr-3 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                      />
-                      <div>
-                        <div className="font-medium text-gray-900">{tool.name}</div>
-                        <div className="text-xs text-gray-600">{tool.description}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* MCP开关 */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    启用 MCP
+            {/* 工具绑定 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-4">工具绑定</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-60 overflow-y-auto pr-2">
+                {getToolsList().map((tool) => (
+                  <label
+                    key={tool.key}
+                    className={`flex items-center p-3 border rounded-xl cursor-pointer transition-all duration-300 ${
+                      selectedTools.includes(tool.key) ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-indigo-300'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      value={tool.key}
+                      checked={selectedTools.includes(tool.key)}
+                      onChange={() => handleToolToggle(tool.key)}
+                      className="mr-3 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <div>
+                      <div className="font-medium text-gray-900">{tool.name}</div>
+                      <div className="text-xs text-gray-600">{tool.description}</div>
+                    </div>
                   </label>
-                </div>
+                ))}
+              </div>
+            </div>
 
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={mcpEnabled}
-                    onChange={(e) => setMcpEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            {/* MCP开关 */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  启用 MCP
                 </label>
               </div>
 
-              {/* MCP配置区域 */}
-              {mcpEnabled && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-4">MCP 服务器配置</label>
-                  <textarea
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono text-sm"
-                    rows={8}
-                    value={mcpConfig}
-                    onChange={(e) => handleMcpConfigChange(e.target.value)}
-                    placeholder={`{
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={mcpEnabled}
+                  onChange={(e) => setMcpEnabled(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            {/* MCP配置区域 */}
+            {mcpEnabled && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-4">MCP 服务器配置</label>
+                <textarea
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono text-sm"
+                  rows={8}
+                  value={mcpConfig}
+                  onChange={(e) => handleMcpConfigChange(e.target.value)}
+                  placeholder={`{
   "suagent-youtube-mcp": {
     "type": "sse",
     "url": "http://127.0.0.1:10086/sse"
@@ -311,36 +324,13 @@ export default function CreateAgentPage() {
     "url": "https://mcp.api-inference.modelscope.net/xxxx/sse"
   }
 }`}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">配置自定义模型服务的连接信息，可与系统工具同时使用</p>
-                </div>
-              )}
-            </div>
+                />
+                <p className="text-xs text-gray-500 mt-1">配置自定义模型服务的连接信息，可与系统工具同时使用</p>
+              </div>
+            )}
           </div>
-
-          {/* 创建按钮 */}
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={handleCreateAgent}
-              disabled={isCreating}
-              className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-4 rounded-xl font-semibold text-base hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-0.5 hover:shadow-lg"
-            >
-              {isCreating ? (
-                <>
-                  <FaSpinner className="inline mr-2 animate-spin" />
-                  创建中...
-                </>
-              ) : (
-                <>
-                  <FaPlus className="inline mr-2" />
-                  创建智能体
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </main>
+        </div>
+      </div>
 
       {/* 成功提示模态框 */}
       {showSuccessModal && (

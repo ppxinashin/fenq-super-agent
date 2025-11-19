@@ -7,7 +7,7 @@ import { FaSearch, FaSpinner } from 'react-icons/fa'
 import Footer from '@/components/Footer'
 import { toast } from 'react-hot-toast'
 import AuthProtected from '@/components/AuthProtected'
-import { AgentsAPI } from '../../api'
+import { AgentsAPI, ChatAPI } from '../../api'
 import { AgentSimpleInfo } from '../../api'
 import { generateAgentAvatarGradient, getAgentAvatarText } from '../../utils/avatarHelper'
 
@@ -97,17 +97,31 @@ export default function MarketPage() {
   }
 
   // 处理智能体点击
-  const handleAgentClick = (agentId: string, agentName: string) => {
-    toast.success(`正在加载 ${agentName}...`)
-
+  const handleAgentClick = async (agentId: string, agentName: string) => {
     if (isMobile()) {
-      // 移动端：直接创建新session并跳转到聊天页面
-      const sessionId = Date.now().toString()
-      setTimeout(() => {
-        router.push(`/chat/${agentId}/${sessionId}`)
-      }, 300)
+      // 移动端：调用API创建新session并跳转到聊天页面
+      try {
+        toast.loading(`正在加载 ${agentName}...`, { id: 'loading-agent' })
+        
+        const response = await ChatAPI.createSession({ agent_id: agentId })
+        
+        if (response.code === 200 && response.result) {
+          const sessionId = response.result.session_id
+          toast.success(`${agentName} 已准备就绪`, { id: 'loading-agent' })
+          
+          setTimeout(() => {
+            router.push(`/chat/${agentId}/${sessionId}`)
+          }, 300)
+        } else {
+          toast.error(response.message || '创建会话失败', { id: 'loading-agent' })
+        }
+      } catch (error: any) {
+        console.error('创建会话失败:', error)
+        toast.error(error.response?.data?.message || '创建会话失败', { id: 'loading-agent' })
+      }
     } else {
       // 桌面端：跳转到智能体框架页面
+      toast.success(`正在加载 ${agentName}...`)
       setTimeout(() => {
         router.push(`/chat/${agentId}`)
       }, 500)

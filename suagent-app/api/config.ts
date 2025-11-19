@@ -3,13 +3,31 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 // Base configuration
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
-// Create axios instance
+// Create axios instance with custom JSON parser to preserve large numbers
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
+  transformResponse: [
+    (data) => {
+      if (typeof data === 'string') {
+        try {
+          // 使用正则表达式将大数字转换为字符串，避免精度丢失
+          // 匹配各种ID字段的模式，并将数字用引号包裹
+          const sanitized = data.replace(
+            /"(session_id|user_id|agent_id|file_id|message_id|id)"\s*:\s*(\d{15,})/g,
+            '"$1":"$2"'
+          );
+          return JSON.parse(sanitized);
+        } catch (e) {
+          return data;
+        }
+      }
+      return data;
+    }
+  ],
 });
 
 // Request interceptor to add auth token

@@ -4,8 +4,12 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { FaPaperPlane, FaBrain, FaRobot, FaStop } from 'react-icons/fa'
 import { toast } from 'react-hot-toast'
-import Markdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { MuiMarkdown } from 'mui-markdown'
+import { Highlight, themes } from 'prism-react-renderer'
+import { AgentsAPI, ChatAPI, AgentInfo as AgentInfoType, ChatMessage } from '@/api'
+import { generateAgentAvatarGradient, getAgentAvatarText, generateAvatarGradient, getAvatarText } from '@/utils/avatarHelper'
+import { useAuth } from '@/contexts/AuthContext'
+import { API_BASE_URL } from '@/api/config'
 
 // 检测是否为移动端
 const isMobile = () => {
@@ -20,76 +24,10 @@ interface Message {
   timestamp: Date
 }
 
-interface AgentInfo {
-  id: string
-  name: string
-  description: string
-  color: string
-  welcomeMessage: string
-}
-
-const agentConfigs: Record<string, AgentInfo> = {
-  java: {
-    id: 'java',
-    name: 'Java架构师',
-    description: '一位全能的资深 Java 技术专家',
-    color: 'from-orange-400 to-red-500',
-    welcomeMessage: '我是Java架构师，一位全能的资深Java技术专家'
-  },
-  debug: {
-    id: 'debug',
-    name: '代码 Debug',
-    description: '能助您分析代码、优化性能',
-    color: 'from-blue-400 to-purple-500',
-    welcomeMessage: '我是代码Debug，能助您分析代码、优化性能'
-  },
-  python: {
-    id: 'python',
-    name: 'Python专家',
-    description: '一位精通 Python3 的问题解决专家',
-    color: 'from-green-400 to-blue-500',
-    welcomeMessage: '我是Python专家，一位精通Python3的问题解决专家'
-  },
-  linux: {
-    id: 'linux',
-    name: 'Linux系统',
-    description: 'Linux操作系统与应用专家',
-    color: 'from-gray-400 to-black',
-    welcomeMessage: '我是Linux系统，Linux操作系统与应用专家'
-  },
-  translate: {
-    id: 'translate',
-    name: '技术翻译助手',
-    description: '精通技术文档中英翻译',
-    color: 'from-purple-400 to-pink-500',
-    welcomeMessage: '我是技术翻译助手，精通技术文档中英翻译'
-  },
-  patent: {
-    id: 'patent',
-    name: '专利技术交底书',
-    description: '专业辅助撰写专利交底书',
-    color: 'from-yellow-400 to-orange-500',
-    welcomeMessage: '我是专利技术交底书，专业辅助撰写专利交底书'
-  },
-  work: {
-    id: 'work',
-    name: '工作处理助手',
-    description: '解决各类工作难题，优化流程',
-    color: 'from-teal-400 to-green-500',
-    welcomeMessage: '我是工作处理助手，解决各类工作难题，优化流程'
-  },
-  report: {
-    id: 'report',
-    name: '工作成果汇报',
-    description: '撰写客观全面的绩效自评',
-    color: 'from-indigo-400 to-blue-500',
-    welcomeMessage: '我是工作成果汇报，撰写客观全面的绩效自评'
-  }
-}
-
 export default function ChatSessionPage() {
   const params = useParams()
   const router = useRouter()
+  const { user } = useAuth()
   const agentId = params.agent as string
   const sessionId = params.session as string
 
@@ -98,11 +36,43 @@ export default function ChatSessionPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [isMobileView, setIsMobileView] = useState(false)
+  const [agentInfo, setAgentInfo] = useState<AgentInfoType | null>(null)
+  const [loadingAgent, setLoadingAgent] = useState(true)
+  const [loadingHistory, setLoadingHistory] = useState(true)
+  const [hasHistory, setHasHistory] = useState(false)
+  const [isFirstMessage, setIsFirstMessage] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const streamingRef = useRef<NodeJS.Timeout | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  
+  const username = user?.username || 'User'
 
-  const agentInfo = agentConfigs[agentId]
+  // 加载智能体信息
+  useEffect(() => {
+    const loadAgentInfo = async () => {
+      try {
+        setLoadingAgent(true)
+        const response = await AgentsAPI.getAgentById(agentId)
+        
+        if (response.code === 200 && response.result) {
+          setAgentInfo(response.result)
+        } else {
+          toast.error('智能体不存在')
+          router.push('/market')
+        }
+      } catch (error: any) {
+        console.error('加载智能体信息失败:', error)
+        toast.error('加载智能体信息失败')
+        router.push('/market')
+      } finally {
+        setLoadingAgent(false)
+      }
+    }
+
+    if (agentId) {
+      loadAgentInfo()
+    }
+  }, [agentId, router])
 
   useEffect(() => {
     // 检测移动端
@@ -118,21 +88,61 @@ export default function ChatSessionPage() {
     }
   }, [])
 
+  // 加载历史消息
   useEffect(() => {
-    if (!agentInfo) {
-      toast.error('智能体不存在')
-      return
+    const loadHistory = async () => {
+      if (!agentInfo || !sessionId) return
+
+      try {
+        setLoadingHistory(true)
+        const response = await ChatAPI.getSessionMessages(sessionId)
+        
+        if (response.code === 200 && response.result) {
+          const historyMessages = response.result.messages || []
+          
+          if (historyMessages.length > 0) {
+            // 有历史记录，转换为Message格式
+            const convertedMessages: Message[] = historyMessages.map((msg: ChatMessage, index: number) => ({
+              id: `history-${index}`,
+              type: msg.role === 'user' ? 'user' : 'agent',
+              content: msg.content,
+              timestamp: new Date(msg.created_at)
+            }))
+            setMessages(convertedMessages)
+            setHasHistory(true)
+            setIsFirstMessage(false)
+          } else {
+            // 没有历史记录，显示欢迎消息
+            const welcomeMessage: Message = {
+              id: 'welcome',
+              type: 'agent',
+              content: `你好！我是${agentInfo.agent_name}，${agentInfo.description}。有什么我可以帮助你的吗？`,
+              timestamp: new Date()
+            }
+            setMessages([welcomeMessage])
+            setHasHistory(false)
+            setIsFirstMessage(true)
+          }
+        }
+      } catch (error: any) {
+        console.error('加载历史消息失败:', error)
+        // 如果加载失败，显示欢迎消息
+        const welcomeMessage: Message = {
+          id: 'welcome',
+          type: 'agent',
+          content: `你好！我是${agentInfo.agent_name}，${agentInfo.description}。有什么我可以帮助你的吗？`,
+          timestamp: new Date()
+        }
+        setMessages([welcomeMessage])
+        setHasHistory(false)
+        setIsFirstMessage(true)
+      } finally {
+        setLoadingHistory(false)
+      }
     }
 
-    // 添加欢迎消息
-    const welcomeMessage: Message = {
-      id: 'welcome',
-      type: 'agent',
-      content: agentInfo.welcomeMessage,
-      timestamp: new Date()
-    }
-    setMessages([welcomeMessage])
-  }, [agentId, agentInfo])
+    loadHistory()
+  }, [agentInfo, sessionId])
 
   useEffect(() => {
     scrollToBottom()
@@ -143,12 +153,13 @@ export default function ChatSessionPage() {
   }
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return
+    if (!inputMessage.trim() || isStreaming) return
 
+    const userMessageContent = inputMessage.trim()
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
-      content: inputMessage,
+      content: userMessageContent,
       timestamp: new Date()
     }
 
@@ -157,8 +168,8 @@ export default function ChatSessionPage() {
     setIsLoading(true)
     setIsStreaming(true)
 
-    // 模拟AI流式回复
-    const agentMessageId = (Date.now() + 1).toString()
+    // 创建AI消息占位符
+    const agentMessageId = `agent-${Date.now()}`
     const agentReply: Message = {
       id: agentMessageId,
       type: 'agent',
@@ -167,61 +178,117 @@ export default function ChatSessionPage() {
     }
     setMessages(prev => [...prev, agentReply])
 
-    // 模拟流式输出
-    const fullContent = `感谢你的提问！关于"${userMessage.content}"，我需要为你提供详细的解答。
+    // 调用流式聊天接口
+    try {
+      const token = sessionStorage.getItem('access_token')
+      abortControllerRef.current = new AbortController()
 
-## 分析要点
+      const url = `${API_BASE_URL}/api/v1/chat?agent_id=${encodeURIComponent(agentId)}&session_id=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(userMessageContent)}`
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'text/event-stream',
+        },
+        signal: abortControllerRef.current.signal
+      })
 
-让我为你分析一下这个问题：
-
-1. **核心概念理解**
-   - 这是一个关于 **${userMessage.content}** 的问题
-   - 需要从多个角度进行思考
-
-2. **解决方案**
-   \`\`\`javascript
-   // 示例代码
-   function solveProblem(input) {
-     return input.map(item => process(item));
-   }
-   \`\`\`
-
-3. **重要提示**
-   - 注意事项 ⚠️
-   - 最佳实践 ✅
-
-> 💡 **建议**: 如果需要更详细的解释，请随时提问！`
-
-    const chunks = fullContent.split(' ')
-    let currentContent = ''
-    let chunkIndex = 0
-
-    streamingRef.current = setInterval(() => {
-      if (chunkIndex < chunks.length) {
-        currentContent += (chunkIndex > 0 ? ' ' : '') + chunks[chunkIndex]
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === agentMessageId
-              ? { ...msg, content: currentContent }
-              : msg
-          )
-        )
-        chunkIndex++
-      } else {
-        if (streamingRef.current) {
-          clearInterval(streamingRef.current)
-          streamingRef.current = null
-        }
-        setIsLoading(false)
-        setIsStreaming(false)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
-    }, 50)
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      let accumulatedContent = ''
+      let buffer = ''
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read()
+          
+          if (done) {
+            break
+          }
+
+          // 解码数据块
+          buffer += decoder.decode(value, { stream: true })
+          
+          // 按行分割SSE数据
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || '' // 保留最后不完整的行
+          
+          for (const line of lines) {
+            const trimmedLine = line.trim()
+            
+            // 跳过空行
+            if (!trimmedLine) continue
+            
+            // 检查是否是结束标记
+            if (trimmedLine === 'data: [DONE]') {
+              continue
+            }
+            
+            // 解析SSE数据格式: data: {"text": "..."}
+            if (trimmedLine.startsWith('data: ')) {
+              try {
+                const jsonStr = trimmedLine.substring(6) // 移除 "data: " 前缀
+                const jsonData = JSON.parse(jsonStr)
+                
+                // 提取text字段
+                if (jsonData.text !== undefined) {
+                  accumulatedContent += jsonData.text
+                  
+                  // 更新消息内容
+                  setMessages(prev =>
+                    prev.map(msg =>
+                      msg.id === agentMessageId
+                        ? { ...msg, content: accumulatedContent }
+                        : msg
+                    )
+                  )
+                }
+              } catch (parseError) {
+                console.error('解析SSE数据失败:', parseError, 'Line:', trimmedLine)
+              }
+            }
+          }
+        }
+      }
+
+      // 流式输出完成后，如果是第一条消息，自动生成标题
+      if (isFirstMessage) {
+        try {
+          await ChatAPI.generateSessionTitle(sessionId)
+          setIsFirstMessage(false)
+          
+          // 通知父窗口刷新会话列表
+          if (window.parent !== window) {
+            window.parent.postMessage({ type: 'SESSION_TITLE_UPDATED', sessionId }, '*')
+          }
+        } catch (error) {
+          console.error('生成会话标题失败:', error)
+        }
+      }
+
+    } catch (error: any) {
+      console.error('发送消息失败:', error)
+      if (error.name !== 'AbortError') {
+        toast.error('发送消息失败，请重试')
+        // 移除失败的消息
+        setMessages(prev => prev.filter(msg => msg.id !== agentMessageId))
+      }
+    } finally {
+      setIsLoading(false)
+      setIsStreaming(false)
+      abortControllerRef.current = null
+    }
   }
 
   const handleStopStreaming = () => {
-    if (streamingRef.current) {
-      clearInterval(streamingRef.current)
-      streamingRef.current = null
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
     }
     setIsLoading(false)
     setIsStreaming(false)
@@ -248,18 +315,28 @@ export default function ChatSessionPage() {
     adjustTextareaHeight()
   }, [inputMessage])
 
-  // 清理定时器
+  // 清理abort controller
   useEffect(() => {
     return () => {
-      if (streamingRef.current) {
-        clearInterval(streamingRef.current)
-        streamingRef.current = null
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
       }
     }
   }, [])
 
-  if (!agentInfo) {
-    return null
+  // 加载状态
+  if (loadingAgent || !agentInfo || loadingHistory) {
+    return (
+      <div className="h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">
+            {loadingAgent ? '加载智能体信息...' : loadingHistory ? '加载聊天记录...' : '加载中...'}
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -277,10 +354,15 @@ export default function ChatSessionPage() {
               </svg>
             </button>
             <div className="flex items-center space-x-2">
-              <div className={`w-8 h-8 bg-gradient-to-r ${agentInfo.color} rounded-full flex items-center justify-center`}>
-                <FaRobot className="text-white text-sm" />
+              <div 
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                style={{
+                  background: generateAgentAvatarGradient(agentInfo.agent_id)
+                }}
+              >
+                {getAgentAvatarText(agentInfo.agent_name)}
               </div>
-              <h2 className="text-lg font-semibold text-gray-900">{agentInfo.name}</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{agentInfo.agent_name}</h2>
             </div>
           </div>
         </div>
@@ -293,14 +375,19 @@ export default function ChatSessionPage() {
             <div
               key={message.id}
               className={`flex items-start space-x-3 ${
-                message.type === 'user' ? 'justify-end' : ''
-              }`}
-            >
-              {message.type === 'agent' && (
-                <div className={`w-8 h-8 bg-gradient-to-r ${agentInfo.color} rounded-full flex items-center justify-center flex-shrink-0`}>
-                  <FaRobot className="text-white text-sm" />
-                </div>
-              )}
+              message.type === 'user' ? 'justify-end' : ''
+            }`}
+          >
+            {message.type === 'agent' && (
+              <div 
+                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"
+                style={{
+                  background: generateAgentAvatarGradient(agentInfo.agent_id)
+                }}
+              >
+                {getAgentAvatarText(agentInfo.agent_name)}
+              </div>
+            )}
               <div
                 className={`max-w-2xl px-4 py-3 rounded-2xl shadow-sm ${
                   message.type === 'user'
@@ -311,14 +398,165 @@ export default function ChatSessionPage() {
                 {message.type === 'user' ? (
                   <p className="whitespace-pre-wrap break-words">{message.content}</p>
                 ) : (
-                  <div className="prose prose-sm max-w-none prose-headings:text-gray-800 prose-p:text-gray-700 prose-code:text-pink-600 prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-blockquote:border-l-indigo-500 prose-blockquote:text-gray-600 prose-strong:text-gray-900 prose-ul:text-gray-700 prose-ol:text-gray-700">
-                    <Markdown remarkPlugins={[remarkGfm]}>{message.content}</Markdown>
-                  </div>
+                  <MuiMarkdown
+                    overrides={{
+                      a: {
+                        component: 'a',
+                        props: {
+                          target: '_blank',
+                          rel: 'noopener noreferrer',
+                          style: { color: '#4f46e5', textDecoration: 'underline' }
+                        },
+                      },
+                      h1: {
+                        component: 'h1',
+                        props: {
+                          style: { 
+                            fontSize: '1.875rem', 
+                            fontWeight: 'bold', 
+                            marginTop: '1.5rem', 
+                            marginBottom: '1rem',
+                            color: '#1f2937'
+                          }
+                        },
+                      },
+                      h2: {
+                        component: 'h2',
+                        props: {
+                          style: { 
+                            fontSize: '1.5rem', 
+                            fontWeight: 'bold', 
+                            marginTop: '1.25rem', 
+                            marginBottom: '0.75rem',
+                            color: '#1f2937'
+                          }
+                        },
+                      },
+                      h3: {
+                        component: 'h3',
+                        props: {
+                          style: { 
+                            fontSize: '1.25rem', 
+                            fontWeight: 'bold', 
+                            marginTop: '1rem', 
+                            marginBottom: '0.5rem',
+                            color: '#1f2937'
+                          }
+                        },
+                      },
+                      p: {
+                        component: 'p',
+                        props: {
+                          style: { 
+                            marginBottom: '0.75rem',
+                            lineHeight: '1.6',
+                            color: '#374151'
+                          }
+                        },
+                      },
+                      ul: {
+                        component: 'ul',
+                        props: {
+                          style: { 
+                            marginBottom: '0.75rem',
+                            paddingLeft: '1.5rem',
+                            color: '#374151'
+                          }
+                        },
+                      },
+                      ol: {
+                        component: 'ol',
+                        props: {
+                          style: { 
+                            marginBottom: '0.75rem',
+                            paddingLeft: '1.5rem',
+                            color: '#374151'
+                          }
+                        },
+                      },
+                      li: {
+                        component: 'li',
+                        props: {
+                          style: { 
+                            marginBottom: '0.25rem',
+                            lineHeight: '1.6'
+                          }
+                        },
+                      },
+                      blockquote: {
+                        component: 'blockquote',
+                        props: {
+                          style: { 
+                            borderLeft: '4px solid #4f46e5',
+                            paddingLeft: '1rem',
+                            margin: '1rem 0',
+                            fontStyle: 'italic',
+                            color: '#6b7280'
+                          }
+                        },
+                      },
+                      table: {
+                        component: 'table',
+                        props: {
+                          style: { 
+                            width: '100%',
+                            borderCollapse: 'collapse',
+                            marginBottom: '1rem'
+                          }
+                        },
+                      },
+                      th: {
+                        component: 'th',
+                        props: {
+                          style: { 
+                            border: '1px solid #e5e7eb',
+                            padding: '0.5rem',
+                            textAlign: 'left',
+                            backgroundColor: '#f9fafb',
+                            fontWeight: 'bold'
+                          }
+                        },
+                      },
+                      td: {
+                        component: 'td',
+                        props: {
+                          style: { 
+                            border: '1px solid #e5e7eb',
+                            padding: '0.5rem',
+                            textAlign: 'left'
+                          }
+                        },
+                      },
+                      code: {
+                        component: 'code',
+                        props: {
+                          style: { 
+                            backgroundColor: '#f3f4f6',
+                            padding: '0.125rem 0.25rem',
+                            borderRadius: '0.25rem',
+                            fontSize: '0.875rem',
+                            color: '#d1d5db'
+                          }
+                        },
+                      },
+                    }}
+                    Highlight={Highlight}
+                    themes={themes}
+                    prismTheme={themes.github}
+                  >
+                    {message.content}
+                  </MuiMarkdown>
                 )}
               </div>
               {message.type === 'user' && (
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <FaBrain className="text-white text-sm" />
+                <div 
+                  className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold text-xs"
+                  style={{
+                    background: generateAvatarGradient(username),
+                    textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  {getAvatarText(username)}
                 </div>
               )}
             </div>
@@ -327,8 +565,13 @@ export default function ChatSessionPage() {
           {/* 加载状态 */}
           {isLoading && (
             <div className="flex items-start space-x-3">
-              <div className={`w-8 h-8 bg-gradient-to-r ${agentInfo.color} rounded-full flex items-center justify-center flex-shrink-0`}>
-                <FaRobot className="text-white text-sm" />
+              <div 
+                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"
+                style={{
+                  background: generateAgentAvatarGradient(agentInfo.agent_id)
+                }}
+              >
+                {getAgentAvatarText(agentInfo.agent_name)}
               </div>
               <div className="bg-gray-100 text-gray-800 border border-gray-200 px-4 py-3 rounded-2xl shadow-sm">
                 <div className="flex items-center space-x-2">

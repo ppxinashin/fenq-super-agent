@@ -8,68 +8,16 @@ import MobileOnlyNotice from '@/components/MobileOnlyNotice'
 import { FaArrowLeft, FaSave, FaRobot, FaInfoCircle, FaTimes, FaCogs } from 'react-icons/fa'
 import { toast } from 'react-hot-toast'
 import { isMobile } from '@/hooks/useMobileRedirect'
-
-interface Agent {
-  id: number
-  agentId: string
-  name: string
-  description: string
-  systemPrompt: string
-  createdBy: string
-  createdAt: string
-  updatedBy: string
-  updatedAt: string
-}
-
-interface ToolConfig {
-  id: string
-  name: string
-  description: string
-  enabled: boolean
-}
-
-const mockAgents: Agent[] = [
-  {
-    id: 1,
-    agentId: 'customer_service',
-    name: '客服助手',
-    description: '专业的在线客服智能助手，提供24小时服务支持',
-    systemPrompt: '你是一个专业的在线客服助手，具备良好的沟通能力和服务意识。能够耐心解答用户问题，提供专业的产品咨询和服务支持。请以友好、专业的态度与用户交流。',
-    createdBy: 'admin',
-    createdAt: '2024-01-20 10:30:00',
-    updatedBy: 'admin',
-    updatedAt: '2024-02-15 14:20:00'
-  },
-  {
-    id: 2,
-    agentId: 'data_analyst',
-    name: '数据分析师',
-    description: '专业的数据分析智能助手，擅长数据处理和可视化',
-    systemPrompt: '你是一个专业的数据分析师，精通数据处理、统计分析和数据可视化。能够帮助用户进行数据清洗、统计分析、制作图表等工作。请以专业、严谨的态度为用户提供数据分析服务。',
-    createdBy: 'admin',
-    createdAt: '2024-01-21 09:15:00',
-    updatedBy: 'admin',
-    updatedAt: '2024-02-10 16:45:00'
-  },
-  {
-    id: 3,
-    agentId: 'content_creator',
-    name: '内容创作者',
-    description: '创意内容生成助手，擅长文案创作和创意写作',
-    systemPrompt: '你是一个创意内容创作者，擅长各类文案写作、创意构思和内容策划。能够根据用户需求创作高质量的营销文案、产品描述、社交媒体内容等。请以创意、专业的态度提供内容创作服务。',
-    createdBy: 'moderator',
-    createdAt: '2024-01-22 11:20:00',
-    updatedBy: 'admin',
-    updatedAt: '2024-02-05 10:30:00'
-  }
-]
+import { AVAILABLE_TOOLS, getToolsList } from '@/utils/availableTools'
+import { AgentsAPI, AgentInfo } from '@/api'
+import { validateMcpConfig } from '@/utils/mcpValidator'
 
 export default function EditAgentPage() {
   const router = useRouter()
   const params = useParams()
   const agentId = params.id as string
   const [isMobileView, setIsMobileView] = useState(false)
-  const [agent, setAgent] = useState<Agent | null>(null)
+  const [agent, setAgent] = useState<AgentInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -79,15 +27,7 @@ export default function EditAgentPage() {
     systemPrompt: ''
   })
 
-  const [tools, setTools] = useState<ToolConfig[]>([
-    { id: 'web_search', name: '网页搜索', description: '获取实时网络信息', enabled: true },
-    { id: 'calculator', name: '计算器', description: '进行数学计算', enabled: true },
-    { id: 'code_execution', name: '代码执行', description: '运行代码片段', enabled: false },
-    { id: 'file_processing', name: '文件处理', description: '读取和处理文件', enabled: false },
-    { id: 'image_generation', name: '图片生成', description: '根据描述生成图片', enabled: false },
-    { id: 'speech_to_text', name: '语音转文字', description: '处理语音输入', enabled: false }
-  ])
-
+  const [selectedTools, setSelectedTools] = useState<string[]>([])
   const [mcpEnabled, setMcpEnabled] = useState(false)
   const [mcpConfig, setMcpConfig] = useState('')
 
@@ -100,31 +40,49 @@ export default function EditAgentPage() {
     checkMobile()
     window.addEventListener('resize', checkMobile)
 
-    // 如果是移动端，显示限制页面
-    if (isMobile()) {
+    return () => {
+      window.removeEventListener('resize', checkMobile)
+    }
+  }, [])
+
+  useEffect(() => {
+    // 如果是移动端，不加载数据
+    if (isMobileView) {
       return
     }
 
     // 加载智能体数据
-    const foundAgent = mockAgents.find(a => a.id.toString() === agentId)
-    if (foundAgent) {
-      setAgent(foundAgent)
-      setFormData({
-        name: foundAgent.name,
-        description: foundAgent.description,
-        systemPrompt: foundAgent.systemPrompt
-      })
-    } else {
-      toast.error('智能体不存在')
-      router.push('/agents')
+    const loadAgentData = async () => {
+      try {
+        setIsLoading(true)
+        const response = await AgentsAPI.getAgentById(agentId)
+        
+        if (response.code === 200 && response.result) {
+          const agentData = response.result
+          setAgent(agentData)
+          setFormData({
+            name: agentData.agent_name,
+            description: agentData.description,
+            systemPrompt: agentData.system_prompt
+          })
+          setSelectedTools(agentData.tools || [])
+          setMcpEnabled(agentData.mcp_status || false)
+          setMcpConfig(agentData.mcp_config || '')
+        } else {
+          toast.error('智能体不存在')
+          router.push('/agents')
+        }
+      } catch (error: any) {
+        console.error('加载智能体数据错误:', error)
+        toast.error('加载智能体数据失败')
+        router.push('/agents')
+      } finally {
+        setIsLoading(false)
+      }
     }
 
-    setIsLoading(false)
-
-    return () => {
-      window.removeEventListener('resize', checkMobile)
-    }
-  }, [agentId, router])
+    loadAgentData()
+  }, [agentId, router, isMobileView])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -134,29 +92,58 @@ export default function EditAgentPage() {
     }))
   }
 
-  const handleToolToggle = (toolId: string) => {
-    setTools(prev => prev.map(tool =>
-      tool.id === toolId ? { ...tool, enabled: !tool.enabled } : tool
-    ))
+  const handleToolToggle = (toolKey: string) => {
+    setSelectedTools(prev => 
+      prev.includes(toolKey)
+        ? prev.filter(key => key !== toolKey)
+        : [...prev, toolKey]
+    )
   }
 
   const handleMcpConfigChange = (value: string) => {
     setMcpConfig(value)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name.trim() || !formData.description.trim() || !formData.systemPrompt.trim()) {
       toast.error('请填写所有必填字段')
       return
     }
 
+    // 验证MCP配置格式
+    if (mcpEnabled && mcpConfig.trim() && mcpConfig.trim() !== '{}') {
+      const validation = validateMcpConfig(mcpConfig)
+      if (!validation.valid) {
+        toast.error(`MCP配置格式错误: ${validation.error}`)
+        return
+      }
+    }
+
     setIsSaving(true)
 
-    setTimeout(() => {
+    try {
+      const response = await AgentsAPI.updateAgent({
+        agent_id: agentId,
+        agent_name: formData.name.trim(),
+        description: formData.description.trim(),
+        system_prompt: formData.systemPrompt.trim(),
+        tools: selectedTools,
+        mcp_status: mcpEnabled,
+        mcp_config: mcpEnabled && mcpConfig.trim() ? mcpConfig.trim() : '{}'
+      })
+
+      if (response.code === 200) {
+        toast.success('智能体信息更新成功！')
+        router.push('/agents')
+      } else {
+        toast.error(response.message || '更新智能体失败')
+      }
+    } catch (error: any) {
+      console.error('更新智能体错误:', error)
+      toast.error(error.response?.data?.message || '更新智能体失败')
+    } finally {
       setIsSaving(false)
-      toast.success('智能体信息更新成功！')
-      router.push('/agents')
-    }, 2000)
+    }
   }
 
   // 如果是移动端，显示限制页面
@@ -207,23 +194,39 @@ export default function EditAgentPage() {
           </div>
         </div>
 
+        {/* 智能体详情信息 */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <FaInfoCircle className="text-indigo-500 mr-2" />
+            智能体详情
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gray-50 p-3 rounded-md">
+              <span className="text-sm text-gray-500">智能体标识</span>
+              <p className="font-medium text-gray-900">{agent.agent_id}</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-md">
+              <span className="text-sm text-gray-500">创建者</span>
+              <p className="font-medium text-gray-900">@{agent.creator_username}</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-md">
+              <span className="text-sm text-gray-500">创建时间</span>
+              <p className="font-medium text-gray-900">{agent.created_at ? new Date(agent.created_at).toLocaleString('zh-CN') : '-'}</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-md">
+              <span className="text-sm text-gray-500">最后更新</span>
+              <p className="font-medium text-gray-900">{agent.updated_by_username ? `@${agent.updated_by_username}` : '-'}</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-md col-span-2">
+              <span className="text-sm text-gray-500">更新时间</span>
+              <p className="font-medium text-gray-900">{agent.updated_at ? new Date(agent.updated_at).toLocaleString('zh-CN') : '-'}</p>
+            </div>
+          </div>
+        </div>
+
         {/* 表单内容 */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
           <div className="space-y-6">
-            {/* 智能体标识（只读） */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                智能体标识 <span className="text-gray-500 text-xs">(不可修改)</span>
-              </label>
-              <input
-                type="text"
-                value={agent.agentId}
-                disabled
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed"
-                readOnly
-              />
-            </div>
-
             {/* 智能体名称 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -289,17 +292,18 @@ export default function EditAgentPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-4">工具绑定</label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-60 overflow-y-auto pr-2">
-                  {tools.map((tool) => (
+                  {getToolsList().map((tool) => (
                     <label
-                      key={tool.id}
+                      key={tool.key}
                       className={`flex items-center p-3 border rounded-xl cursor-pointer transition-all duration-300 ${
-                        tool.enabled ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-indigo-300'
+                        selectedTools.includes(tool.key) ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-indigo-300'
                       }`}
                     >
                       <input
                         type="checkbox"
-                        checked={tool.enabled}
-                        onChange={() => handleToolToggle(tool.id)}
+                        value={tool.key}
+                        checked={selectedTools.includes(tool.key)}
+                        onChange={() => handleToolToggle(tool.key)}
                         className="mr-3 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                       />
                       <div>
@@ -353,28 +357,6 @@ export default function EditAgentPage() {
                   <p className="text-xs text-gray-500 mt-1">配置自定义模型服务的连接信息，可与系统工具同时使用</p>
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* 基本信息 */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <div className="grid grid-cols-2 gap-6 text-sm">
-              <div>
-                <span className="text-gray-500">创建者：</span>
-                <span className="text-gray-900 ml-2">{agent.createdBy}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">创建时间：</span>
-                <span className="text-gray-900 ml-2">{agent.createdAt}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">最后更新：</span>
-                <span className="text-gray-900 ml-2">{agent.updatedBy}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">更新时间：</span>
-                <span className="text-gray-900 ml-2">{agent.updatedAt}</span>
-              </div>
             </div>
           </div>
         </div>

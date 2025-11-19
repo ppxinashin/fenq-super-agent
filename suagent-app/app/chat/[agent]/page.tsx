@@ -4,87 +4,15 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import ConfirmModal from '@/components/ConfirmModal'
-import { FaRobot, FaPlus, FaTrash, FaDatabase, FaComments, FaArrowLeft, FaPaperPlane } from 'react-icons/fa'
+import { FaRobot, FaPlus, FaTrash, FaDatabase, FaComments, FaArrowLeft, FaPaperPlane, FaEdit, FaCheck, FaTimes } from 'react-icons/fa'
 import { toast } from 'react-hot-toast'
+import { AgentsAPI, ChatAPI, AgentInfo as AgentInfoType, SessionInfoResponse } from '@/api'
+import { generateAgentAvatarGradient, getAgentAvatarText } from '@/utils/avatarHelper'
 
 // 检测是否为移动端
 const isMobile = () => {
   if (typeof window === 'undefined') return false
   return window.innerWidth < 1024
-}
-
-interface Conversation {
-  id: string
-  title: string
-  timestamp: string
-  agentId: string
-}
-
-interface AgentInfo {
-  id: string
-  name: string
-  description: string
-  color: string
-  welcomeMessage: string
-}
-
-const agentConfigs: Record<string, AgentInfo> = {
-  java: {
-    id: 'java',
-    name: 'Java架构师',
-    description: '一位全能的资深 Java 技术专家',
-    color: 'from-orange-400 to-red-500',
-    welcomeMessage: '你好！我是Java架构师，我是一位全能的资深Java技术专家，专注于企业级应用架构设计、微服务架构、性能优化等领域。我可以帮助你解决各种Java技术难题。'
-  },
-  debug: {
-    id: 'debug',
-    name: '代码 Debug',
-    description: '能助您分析代码、优化性能',
-    color: 'from-blue-400 to-purple-500',
-    welcomeMessage: '你好！我是代码Debug专家，我可以帮助你分析代码、优化性能、解答编程疑问。有什么问题需要我协助解决吗？'
-  },
-  python: {
-    id: 'python',
-    name: 'Python专家',
-    description: '一位精通 Python3 的问题解决专家',
-    color: 'from-green-400 to-blue-500',
-    welcomeMessage: '你好！我是Python专家，精通Python3和各类Python框架。无论是数据分析、机器学习还是Web开发，我都能为你提供专业的帮助。'
-  },
-  linux: {
-    id: 'linux',
-    name: 'Linux系统',
-    description: 'Linux操作系统与应用专家',
-    color: 'from-gray-400 to-black',
-    welcomeMessage: '你好！我是Linux系统专家，可以帮助你学习Linux操作系统与应用，从基础命令到高级系统管理，我都能为你提供指导。'
-  },
-  translate: {
-    id: 'translate',
-    name: '技术翻译助手',
-    description: '精通技术文档中英翻译',
-    color: 'from-purple-400 to-pink-500',
-    welcomeMessage: '你好！我是技术翻译助手，精通技术文档的中英翻译与写作，可以为你提供专业的翻译服务。'
-  },
-  patent: {
-    id: 'patent',
-    name: '专利技术交底书',
-    description: '专业辅助撰写专利交底书',
-    color: 'from-yellow-400 to-orange-500',
-    welcomeMessage: '你好！我是专利技术交底书专家，可以专业辅助你撰写专利交底书，确保高效精准，遵循流程规范。'
-  },
-  work: {
-    id: 'work',
-    name: '工作处理助手',
-    description: '解决各类工作难题，优化流程',
-    color: 'from-teal-400 to-green-500',
-    welcomeMessage: '你好！我是工作处理助手，可以帮助你解决各类工作难题，优化工作流程，提高工作效率。'
-  },
-  report: {
-    id: 'report',
-    name: '工作成果汇报',
-    description: '撰写客观全面的绩效自评',
-    color: 'from-indigo-400 to-blue-500',
-    welcomeMessage: '你好！我是工作成果汇报专家，可以为你撰写客观全面的绩效自评，分点展示你的工作详情和成果。'
-  }
 }
 
 export default function ChatFrameworkPage() {
@@ -96,30 +24,70 @@ export default function ChatFrameworkPage() {
   const initialSessionId = params.session as string
   const [activePanel, setActivePanel] = useState<'chat' | 'knowledge'>('chat')
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
-  const [conversations, setConversations] = useState<Conversation[]>([
-    {
-      id: '1',
-      title: '如何设计高并发订单系统？',
-      timestamp: '刚刚',
-      agentId: 'java'
-    },
-    {
-      id: '2',
-      title: 'Spring Boot多数据源配置',
-      timestamp: '昨天',
-      agentId: 'java'
-    }
-  ])
+  const [agentInfo, setAgentInfo] = useState<AgentInfoType | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [conversations, setConversations] = useState<SessionInfoResponse[]>([])
+  const [loadingSessions, setLoadingSessions] = useState(false)
 
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null)
+  
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState('')
 
-  const agentInfo = agentConfigs[agentId]
+  // 加载会话列表（最多20条）
+  const loadSessions = async () => {
+    try {
+      setLoadingSessions(true)
+      const response = await ChatAPI.getSessions({
+        agent_id: agentId,
+        page: 1,
+        page_size: 20
+      })
+      
+      if (response.code === 200 && response.result) {
+        setConversations(response.result.data || [])
+      } else {
+        console.error('加载会话列表失败:', response.message)
+      }
+    } catch (error: any) {
+      console.error('加载会话列表错误:', error)
+    } finally {
+      setLoadingSessions(false)
+    }
+  }
+
+  // 加载智能体信息
+  useEffect(() => {
+    const loadAgentInfo = async () => {
+      try {
+        setLoading(true)
+        const response = await AgentsAPI.getAgentById(agentId)
+        
+        if (response.code === 200 && response.result) {
+          setAgentInfo(response.result)
+          // 加载完智能体信息后，加载会话列表
+          loadSessions()
+        } else {
+          toast.error('智能体不存在')
+          router.push('/market')
+        }
+      } catch (error: any) {
+        console.error('加载智能体信息失败:', error)
+        toast.error('加载智能体信息失败')
+        router.push('/market')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (agentId) {
+      loadAgentInfo()
+    }
+  }, [agentId, router])
 
   useEffect(() => {
     if (!agentInfo) {
-      toast.error('智能体不存在')
-      router.push('/market')
       return
     }
 
@@ -151,53 +119,95 @@ export default function ChatFrameworkPage() {
       }
     }
 
+    // 监听来自iframe的消息（标题更新通知）
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'SESSION_TITLE_UPDATED') {
+        // 重新加载会话列表以获取更新的标题
+        loadSessions()
+      }
+    }
+
     window.addEventListener('popstate', handlePopState)
+    window.addEventListener('message', handleMessage)
 
     return () => {
       window.removeEventListener('popstate', handlePopState)
+      window.removeEventListener('message', handleMessage)
     }
   }, [agentId, agentInfo, router, sessionIdFromUrl, initialSessionId])
 
-  const handleNewConversation = () => {
-    const newId = Date.now().toString()
-    const newConversation: Conversation = {
-      id: newId,
-      title: '新对话',
-      timestamp: '刚刚',
-      agentId: agentId
+  const handleNewConversation = async () => {
+    try {
+      toast.loading('正在创建新对话...', { id: 'new-conversation' })
+      
+      // 调用API创建会话
+      const response = await ChatAPI.createSession({ agent_id: agentId })
+      
+      if (response.code === 200 && response.result) {
+        const sessionId = response.result.session_id
+        
+        // 重新加载会话列表
+        await loadSessions()
+        
+        // 更新URL但不跳转
+        const url = new URL(window.location.href)
+        url.searchParams.set('session', sessionId)
+        window.history.pushState({}, '', url.toString())
+        
+        // 设置当前session并切换到对话面板
+        setCurrentSessionId(sessionId)
+        setActivePanel('chat')
+        
+        toast.success('新对话已创建', { id: 'new-conversation' })
+      } else {
+        toast.error(response.message || '创建对话失败', { id: 'new-conversation' })
+      }
+    } catch (error: any) {
+      console.error('创建对话失败:', error)
+      toast.error(error.response?.data?.message || '创建对话失败', { id: 'new-conversation' })
     }
-
-    setConversations(prev => [newConversation, ...prev])
-    // 更新URL但不跳转
-    const url = new URL(window.location.href)
-    url.searchParams.set('session', newId)
-    window.history.pushState({}, '', url.toString())
-    // 设置当前session并切换到对话面板
-    setCurrentSessionId(newId)
-    setActivePanel('chat')
-    toast.success('新对话已创建')
   }
 
-  const handleSelectConversation = (conversationId: string) => {
+  const handleSelectConversation = (sessionId: string) => {
     // 更新URL但不跳转，只是改变地址栏
     const url = new URL(window.location.href)
-    url.searchParams.set('session', conversationId)
+    url.searchParams.set('session', sessionId)
     window.history.pushState({}, '', url.toString())
     // 设置当前session并切换到对话面板
-    setCurrentSessionId(conversationId)
+    setCurrentSessionId(sessionId)
     setActivePanel('chat')
   }
 
-  const handleDeleteConversation = (conversationId: string, e: React.MouseEvent) => {
+  const handleDeleteConversation = (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    setConversationToDelete(conversationId)
+    setConversationToDelete(sessionId)
     setShowDeleteModal(true)
   }
 
-  const confirmDeleteConversation = () => {
+  const confirmDeleteConversation = async () => {
     if (conversationToDelete) {
-      setConversations(prev => prev.filter(conv => conv.id !== conversationToDelete))
-      toast.success('对话已删除')
+      try {
+        const response = await ChatAPI.deleteSession(conversationToDelete)
+        
+        if (response.code === 200) {
+          // 如果删除的是当前会话，清空当前会话ID
+          if (currentSessionId === conversationToDelete) {
+            setCurrentSessionId(null)
+            const url = new URL(window.location.href)
+            url.searchParams.delete('session')
+            window.history.pushState({}, '', url.toString())
+          }
+          
+          // 重新加载会话列表
+          await loadSessions()
+          toast.success('对话已删除')
+        } else {
+          toast.error(response.message || '删除对话失败')
+        }
+      } catch (error: any) {
+        console.error('删除对话失败:', error)
+        toast.error(error.response?.data?.message || '删除对话失败')
+      }
       setConversationToDelete(null)
     }
     setShowDeleteModal(false)
@@ -206,6 +216,42 @@ export default function ChatFrameworkPage() {
   const cancelDeleteConversation = () => {
     setConversationToDelete(null)
     setShowDeleteModal(false)
+  }
+
+  const handleStartEditTitle = (sessionId: string, currentTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingSessionId(sessionId)
+    setEditingTitle(currentTitle || '')
+  }
+
+  const handleSaveTitle = async (sessionId: string) => {
+    if (!editingTitle.trim()) {
+      toast.error('标题不能为空')
+      return
+    }
+
+    try {
+      const response = await ChatAPI.updateSessionTitle(sessionId, { title: editingTitle.trim() })
+      
+      if (response.code === 200) {
+        // 重新加载会话列表
+        await loadSessions()
+        toast.success('标题已更新')
+      } else {
+        toast.error(response.message || '更新标题失败')
+      }
+    } catch (error: any) {
+      console.error('更新标题失败:', error)
+      toast.error(error.response?.data?.message || '更新标题失败')
+    }
+    
+    setEditingSessionId(null)
+    setEditingTitle('')
+  }
+
+  const handleCancelEdit = () => {
+    setEditingSessionId(null)
+    setEditingTitle('')
   }
 
   const handleSwitchToChat = () => {
@@ -220,8 +266,37 @@ export default function ChatFrameworkPage() {
     router.push('/market')
   }
 
-  if (!agentInfo) {
-    return null
+  // 格式化时间戳
+  const formatTimestamp = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return '刚刚'
+    if (diffMins < 60) return `${diffMins}分钟前`
+    if (diffHours < 24) return `${diffHours}小时前`
+    if (diffDays < 7) return `${diffDays}天前`
+    
+    // 超过7天显示具体日期
+    return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
+  }
+
+  // 加载状态
+  if (loading || !agentInfo) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Header/>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">加载中...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // 桌面端渲染（移动端会自动重定向到聊天会话页面）
@@ -236,12 +311,17 @@ export default function ChatFrameworkPage() {
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
-                <div className={`w-12 h-12 bg-gradient-to-r ${agentInfo.color} rounded-full flex items-center justify-center`}>
-                  <FaRobot className="text-white text-xl" />
+                <div 
+                  className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold"
+                  style={{
+                    background: generateAgentAvatarGradient(agentInfo.agent_id)
+                  }}
+                >
+                  {getAgentAvatarText(agentInfo.agent_name)}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">{agentInfo.name}</h3>
-                  <p className="text-xs text-gray-500">作者</p>
+                  <h3 className="font-semibold text-gray-900">{agentInfo.agent_name}</h3>
+                  <p className="text-xs text-gray-500">@{agentInfo.creator_username}</p>
                 </div>
               </div>
               <button
@@ -292,27 +372,82 @@ export default function ChatFrameworkPage() {
 
           {/* 历史会话 */}
           <div className="flex-1 overflow-y-auto p-4">
-            <h4 className="text-xs font-medium text-gray-500 uppercase mb-3">历史会话</h4>
-            <div className="space-y-2">
-              {conversations.map((conversation) => (
-                <div
-                  key={conversation.id}
-                  onClick={() => handleSelectConversation(conversation.id)}
-                  className="group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-100 hover:shadow-sm"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{conversation.title}</p>
-                    <p className="text-xs text-gray-500">{conversation.timestamp}</p>
-                  </div>
-                  <button
-                    onClick={(e) => handleDeleteConversation(conversation.id, e)}
-                    className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
+            <h4 className="text-xs font-medium text-gray-500 uppercase mb-3 sticky top-0 bg-white z-10 pb-2">历史会话</h4>
+            {loadingSessions ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+              </div>
+            ) : conversations.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 text-sm">
+                暂无会话记录
+              </div>
+            ) : (
+              <div className="space-y-2 pr-2">
+                {conversations.map((conversation) => (
+                  <div
+                    key={conversation.session_id}
+                    onClick={() => editingSessionId !== conversation.session_id && handleSelectConversation(conversation.session_id)}
+                    className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-100 hover:shadow-sm ${
+                      currentSessionId === conversation.session_id ? 'bg-indigo-50 border-indigo-200 border' : ''
+                    }`}
                   >
-                    <FaTrash className="text-sm" />
-                  </button>
-                </div>
-              ))}
-            </div>
+                    <div className="flex-1 min-w-0">
+                      {editingSessionId === conversation.session_id ? (
+                        <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSaveTitle(conversation.session_id)}
+                            className="flex-1 px-2 py-1 text-sm border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => handleSaveTitle(conversation.session_id)}
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            <FaCheck />
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <FaTimes />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {conversation.title || '<无标题>'}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {formatTimestamp(conversation.last_message_at || conversation.created_at)}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                    {editingSessionId !== conversation.session_id && (
+                      <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => handleStartEditTitle(conversation.session_id, conversation.title, e)}
+                          className="text-gray-400 hover:text-indigo-600 p-1"
+                          title="编辑标题"
+                        >
+                          <FaEdit className="text-sm" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteConversation(conversation.session_id, e)}
+                          className="text-gray-400 hover:text-red-600 p-1"
+                          title="删除会话"
+                        >
+                          <FaTrash className="text-sm" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -322,7 +457,7 @@ export default function ChatFrameworkPage() {
           <div className="h-16 border-b border-gray-200 flex items-center justify-between px-6 bg-white">
             <div className="flex items-center space-x-4">
               <h2 className="text-xl font-semibold text-gray-900">
-                {activePanel === 'chat' ? agentInfo.name : '知识库管理'}
+                {activePanel === 'chat' ? agentInfo.agent_name : '知识库管理'}
               </h2>
             </div>
             <div className="flex items-center space-x-4">
@@ -342,11 +477,16 @@ export default function ChatFrameworkPage() {
                 /* 提示页面 */
                 <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
                   <div className="text-center max-w-lg mx-auto px-8">
-                    <div className={`w-24 h-24 bg-gradient-to-r ${agentInfo.color} rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg`}>
-                      <FaRobot className="text-white text-4xl" />
+                    <div 
+                      className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg text-white text-4xl font-bold"
+                      style={{
+                        background: generateAgentAvatarGradient(agentInfo.agent_id)
+                      }}
+                    >
+                      {getAgentAvatarText(agentInfo.agent_name)}
                     </div>
                     <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                      与{agentInfo.name}开始对话
+                      与{agentInfo.agent_name}开始对话
                     </h2>
                     <p className="text-gray-600 text-lg mb-8 max-w-md">
                       点击左侧的"新建对话"按钮，开始与智能体进行对话交流

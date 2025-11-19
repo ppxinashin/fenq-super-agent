@@ -91,55 +91,76 @@ class FileManageService:
         agent_id: str,
         username: str,
         page: int = 1,
-        page_size: int = 20
-    ) -> FileListResponse:
+        page_size: int = 20,
+        keyword: Optional[str] = None
+    ):
         """
-        获取文件列表
+        从MinIO获取文件列表
 
         Args:
             agent_id: 智能体ID
             username: 用户名
             page: 页码
             page_size: 每页数量
+            keyword: 关键词搜索（可选）
 
         Returns:
-            FileListResponse: 文件列表
+            分页响应数据
 
         Raises:
             Exception: 查询失败时抛出异常
         """
         try:
-            # 从PGVector获取文件列表（包含分块信息）
-            pg_files = PGVectorMemory.get_all_files(agent_id=agent_id, user_id=username)
+            # 构建搜索前缀
+            prefix = f"{agent_id}/{username}/"
+
+            # 从MinIO获取文件列表
+            objects = list(self.minio_client.list_objects(prefix=prefix, recursive=True))
+
+            # 过滤掉目录对象（以/结尾的空对象）
+            file_objects = [obj for obj in objects if not obj.object_name.endswith('/')]
+
+            # 获取PGVector中的文件信息（用于分块状态等）
+            pg_files = {}
+            try:
+                pg_file_list = PGVectorMemory.get_all_files(agent_id=agent_id, user_id=username)
+                for pg_file in pg_file_list:
+                    pg_files[pg_file.get("source", "")] = pg_file
+            except Exception as e:
+                logger.warning(f"获取PGVector文件信息失败: {e}")
 
             # 构建文件信息列表
             file_infos = []
-            for pg_file in pg_files:
-                source = pg_file.get("source", "")
-                file_name = os.path.basename(source)
+            for obj in file_objects:
+                object_name = obj.object_name
+                file_name = os.path.basename(object_name)
 
-                # 获取MinIO中的文件信息（用于获取创建时间等）
-                minio_info = None
-                try:
-                    minio_info = self.minio_client.stat_object(source)
-                except Exception as e:
-                    logger.warning(f"无法获取MinIO文件信息: {source}, error={e}")
+                # 关键词过滤
+                if keyword and keyword.lower() not in file_name.lower():
+                    continue
+
+                # 获取PGVector文件信息
+                pg_file = pg_files.get(object_name, {})
 
                 # 确定文件状态
                 status = "已处理" if pg_file.get("total_chunks", 0) > 0 else "处理中"
 
-                file_info = FileInfo(
-                    source=source,
-                    file_name=file_name,
-                    content_type=pg_file.get("content_type"),
-                    minio_bucket=pg_file.get("minio_bucket"),
-                    total_chunks=pg_file.get("total_chunks", 0),
-                    status=status,
-                    author=username,
-                    created_at=minio_info.last_modified if minio_info else None,
-                    updated_at=minio_info.last_modified if minio_info else None
-                )
+                file_info = {
+                    "source": object_name,
+                    "file_name": file_name,
+                    "content_type": pg_file.get("content_type") or "application/octet-stream",
+                    "minio_bucket": self.minio_client.bucket,
+                    "total_chunks": pg_file.get("total_chunks", 0),
+                    "status": status,
+                    "author": username,
+                    "file_size": obj.size,
+                    "created_at": obj.last_modified,
+                    "updated_at": obj.last_modified
+                }
                 file_infos.append(file_info)
+
+            # 按创建时间倒序排列
+            file_infos.sort(key=lambda x: x["created_at"], reverse=True)
 
             # 分页处理
             total = len(file_infos)
@@ -147,11 +168,15 @@ class FileManageService:
             end_idx = start_idx + page_size
             paginated_files = file_infos[start_idx:end_idx]
 
-            logger.info(f"获取文件列表成功: agent_id={agent_id}, user={username}, total={total}")
+            logger.info(f"从MinIO获取文件列表成功: agent_id={agent_id}, user={username}, total={total}")
 
-            return FileListResponse(
-                files=paginated_files,
-                total=total
+            # 返回分页数据
+            from src.response.pageable import create_pageable
+            return create_pageable(
+                page=page,
+                page_size=page_size,
+                total=total,
+                data=paginated_files
             )
 
         except Exception as e:

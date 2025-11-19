@@ -6,15 +6,19 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import ConfirmModal from '@/components/ConfirmModal'
 import MobileOnlyNotice from '@/components/MobileOnlyNotice'
-import { FaUsers, FaCog, FaEdit, FaTrash, FaSearch, FaPlus, FaTimes, FaUser, FaBullseye } from 'react-icons/fa'
+import { FaEdit, FaTrash, FaSearch, FaPlus, FaTimes } from 'react-icons/fa'
 import { toast } from 'react-hot-toast'
 import { isMobile } from '@/hooks/useMobileRedirect'
+import { UsersAPI } from '@/api'
+import { getAvatarText, generateAvatarGradient } from '@/utils/avatarHelper'
 
 interface User {
-  id: number
+  id: bigint  // 使用 bigint 处理雪花号
   username: string
-  role: 'admin' | 'user'
-  createdAt: string
+  role: string
+  is_deleted: boolean
+  created_at: string
+  created_by: string
 }
 
 export default function UserManagementPage() {
@@ -27,11 +31,83 @@ export default function UserManagementPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [pageSize, setPageSize] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [loading, setLoading] = useState(false)
 
-  const [users, setUsers] = useState<User[]>([
-    { id: 1, username: 'admin', role: 'admin', createdAt: '2024-01-15 09:30:00' },
-    { id: 2, username: 'user123', role: 'user', createdAt: '2024-02-20 14:15:00' }
-  ])
+  const [users, setUsers] = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
+
+  // 加载用户列表
+  const loadUsers = async (page: number = 1, size: number = pageSize) => {
+    setLoading(true)
+    try {
+      const response = await UsersAPI.getUserList({
+        page,
+        page_size: size,
+        keyword: searchTerm.trim() || undefined
+      })
+
+      if (response.code === 200) {
+        // 数据在 response.result.data 中
+        const sourceData = response.result?.data
+
+        // 简化处理，直接获取数据
+        let usersArray: User[] = []
+
+        if (Array.isArray(sourceData)) {
+          // 直接返回数组
+          usersArray = sourceData.map((item: any) => ({
+            id: BigInt(item.id || item.user_id),
+            username: item.username,
+            role: item.role,
+            is_deleted: item.is_deleted || false,
+            created_at: item.created_at,
+            created_by: item.created_by || ''
+          }))
+          // 设置分页信息
+          setTotal(response.result?.total || 0)
+          setTotalPages(Math.ceil((response.result?.total || 0) / size))
+          setCurrentPage(response.result?.page || page)
+        } else {
+          // 其他情况，设为空数组
+          usersArray = []
+        }
+
+        // 如果没有分页信息，使用默认值
+        if (total === 0 && usersArray.length > 0) {
+          setTotal(usersArray.length)
+          setTotalPages(Math.ceil(usersArray.length / size))
+          setCurrentPage(page)
+        }
+
+        setUsers(usersArray)
+        setFilteredUsers(usersArray)
+      } else {
+        toast.error(response.message || '加载用户列表失败')
+      }
+    } catch (error: any) {
+      console.error('加载用户列表错误:', error)
+      const errorMessage = error.response?.data?.message || error.message || '加载用户列表失败'
+      toast.error(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 搜索用户
+  useEffect(() => {
+    if (currentPage === 1) {
+      loadUsers(1, pageSize)
+    } else {
+      setCurrentPage(1)
+    }
+  }, [searchTerm])
+
+  // 页码或页面大小改变时重新加载
+  useEffect(() => {
+    loadUsers(currentPage, pageSize)
+  }, [currentPage, pageSize])
 
   const [newUser, setNewUser] = useState({
     username: '',
@@ -66,17 +142,6 @@ export default function UserManagementPage() {
     return <MobileOnlyNotice />
   }
 
-  const filteredUsers = users.filter(user =>
-    user.username.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  const paginatedUsers = filteredUsers.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  )
-
-  const totalPages = Math.ceil(filteredUsers.length / pageSize)
-
   const handlePageSizeChange = (newPageSize: number) => {
     setPageSize(newPageSize)
     setCurrentPage(1)
@@ -86,7 +151,7 @@ export default function UserManagementPage() {
     setCurrentPage(page)
   }
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!newUser.username.trim() || !newUser.password.trim() || !newUser.confirmPassword.trim()) {
@@ -119,26 +184,29 @@ export default function UserManagementPage() {
       return
     }
 
-    const existingUser = users.find(u => u.username === newUser.username)
-    if (existingUser) {
-      toast.error('用户名已存在')
-      return
-    }
+    try {
+      const response = await UsersAPI.createUser({
+        username: newUser.username,
+        password: newUser.password,
+        role: newUser.role
+      })
 
-    const user: User = {
-      id: Math.max(...users.map(u => u.id)) + 1,
-      username: newUser.username,
-      role: newUser.role,
-      createdAt: new Date().toISOString().replace('T', ' ').slice(0, 19)
+      if (response.code === 200) {
+        setNewUser({ username: '', password: '', confirmPassword: '', role: 'user' })
+        setShowCreateModal(false)
+        toast.success('用户创建成功')
+        loadUsers(currentPage, pageSize)
+      } else {
+        toast.error(response.message || '用户创建失败')
+      }
+    } catch (error: any) {
+      console.error('创建用户错误:', error)
+      const errorMessage = error.response?.data?.message || error.message || '用户创建失败'
+      toast.error(errorMessage)
     }
-
-    setUsers([...users, user])
-    setNewUser({ username: '', password: '', confirmPassword: '', role: 'user' })
-    setShowCreateModal(false)
-    toast.success('用户创建成功')
   }
 
-  const handleEditUser = (e: React.FormEvent) => {
+  const handleEditUser = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!editUser.password.trim()) {
@@ -168,18 +236,30 @@ export default function UserManagementPage() {
 
     if (!selectedUser) return
 
-    setUsers(users.map(user =>
-      user.id === selectedUser.id
-        ? { ...user, role: editUser.role }
-        : user
-    ))
+    try {
+      const response = await UsersAPI.updateUser({
+        user_id: selectedUser.id.toString(),
+        password: editUser.password,
+        role: editUser.role
+      })
 
-    setShowEditModal(false)
-    setSelectedUser(null)
-    toast.success('用户信息更新成功')
+      if (response.code === 200) {
+        setShowEditModal(false)
+        setSelectedUser(null)
+        setEditUser({ username: '', role: 'user', password: '', confirmPassword: '' })
+        toast.success('用户信息更新成功')
+        loadUsers(currentPage, pageSize)
+      } else {
+        toast.error(response.message || '用户信息更新失败')
+      }
+    } catch (error: any) {
+      console.error('更新用户错误:', error)
+      const errorMessage = error.response?.data?.message || error.message || '用户信息更新失败'
+      toast.error(errorMessage)
+    }
   }
 
-  const handleDeleteUser = () => {
+  const handleDeleteUser = async () => {
     if (!selectedUser) return
 
     if (selectedUser.username === 'admin') {
@@ -187,16 +267,57 @@ export default function UserManagementPage() {
       return
     }
 
-    setUsers(users.filter(user => user.id !== selectedUser.id))
-    setShowDeleteModal(false)
-    setSelectedUser(null)
-    toast.success('用户删除成功')
+    try {
+      const response = await UsersAPI.deleteUser(selectedUser.id.toString())
+
+      if (response.code === 200) {
+        setShowDeleteModal(false)
+        setSelectedUser(null)
+        toast.success('用户删除成功')
+        loadUsers(currentPage, pageSize)
+      } else {
+        toast.error(response.message || '用户删除失败')
+      }
+    } catch (error: any) {
+      console.error('删除用户错误:', error)
+      const errorMessage = error.response?.data?.message || error.message || '用户删除失败'
+      toast.error(errorMessage)
+    }
   }
 
-  const openEditModal = (user: User) => {
-    setSelectedUser(user)
-    setEditUser({ username: user.username, role: user.role, password: '', confirmPassword: '' })
-    setShowEditModal(true)
+  const openEditModal = async (user: User) => {
+    try {
+      const response = await UsersAPI.getUserById(user.id.toString())
+
+      if (response.code === 200) {
+        // 用户详情API直接返回在response.result中
+        const userData = response.result
+
+        // 转换数据格式以匹配User接口
+        const formattedUser: User = {
+          id: typeof userData.id === 'string' ? BigInt(userData.id) : userData.id,
+          username: userData.username,
+          role: userData.role,
+          is_deleted: userData.is_deleted || false,
+          created_at: userData.created_at,
+          created_by: userData.created_by || ''
+        }
+        setSelectedUser(formattedUser)
+        setEditUser({
+          username: userData.username,
+          role: userData.role as 'admin' | 'user',
+          password: '',
+          confirmPassword: ''
+        })
+        setShowEditModal(true)
+      } else {
+        toast.error(response.message || '获取用户详情失败')
+      }
+    } catch (error: any) {
+      console.error('获取用户详情错误:', error)
+      const errorMessage = error.response?.data?.message || error.message || '获取用户详情失败'
+      toast.error(errorMessage)
+    }
   }
 
   const openDeleteModal = (user: User) => {
@@ -210,14 +331,6 @@ export default function UserManagementPage() {
     ) : (
       <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">用户</span>
     )
-  }
-
-  const getAvatarColor = (role: string) => {
-    return role === 'admin' ? 'bg-blue-100' : 'bg-green-100'
-  }
-
-  const getAvatarTextColor = (role: string) => {
-    return role === 'admin' ? 'text-blue-600' : 'text-green-600'
   }
 
   return (
@@ -294,40 +407,60 @@ export default function UserManagementPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {paginatedUsers.map((user, index) => (
-                    <tr
-                      key={user.id}
-                      className="hover:bg-gray-50 transition-all duration-300 hover:shadow-md"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.id}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-8 h-8 ${getAvatarColor(user.role)} rounded-full flex items-center justify-center transform transition-transform duration-300 hover:scale-110`}>
-                            <FaBullseye className={`text-sm ${getAvatarTextColor(user.role)}`} />
-                          </div>
-                          <span className="text-sm font-medium text-gray-900 hover:text-indigo-600 transition-colors duration-200">{user.username}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getRoleBadge(user.role)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.createdAt}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => openEditModal(user)}
-                          className="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-2 py-1 rounded mr-2 transition-all duration-200"
-                        >
-                          <FaEdit className="inline mr-1" /> 编辑
-                        </button>
-                        <button
-                          onClick={() => openDeleteModal(user)}
-                          className="text-red-600 hover:text-red-900 hover:bg-red-50 px-2 py-1 rounded transition-all duration-200"
-                        >
-                          <FaTrash className="inline mr-1" /> 删除
-                        </button>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                        加载中...
                       </td>
                     </tr>
-                  ))}
+                  ) : filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                        暂无用户数据
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredUsers.map((user) => (
+                      <tr
+                        key={user.id.toString()}
+                        className="hover:bg-gray-50 transition-all duration-300 hover:shadow-md"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.id.toString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-3">
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center transform transition-transform duration-300 hover:scale-110 text-white font-bold text-xs border-2 border-white shadow-lg"
+                              style={{
+                                background: generateAvatarGradient(user.username),
+                                textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                              }}
+                            >
+                              {getAvatarText(user.username)}
+                            </div>
+                            <span className="text-sm font-medium text-gray-900 hover:text-indigo-600 transition-colors duration-200">{user.username}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getRoleBadge(user.role)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.created_at}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => openEditModal(user)}
+                            className="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-2 py-1 rounded mr-2 transition-all duration-200"
+                          >
+                            <FaEdit className="inline mr-1" /> 编辑
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(user)}
+                            className="text-red-600 hover:text-red-900 hover:bg-red-50 px-2 py-1 rounded transition-all duration-200"
+                          >
+                            <FaTrash className="inline mr-1" /> 删除
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -336,7 +469,7 @@ export default function UserManagementPage() {
             <div className="px-6 py-4 border-t border-gray-200 bg-white">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-500">
-                  显示 {(currentPage - 1) * pageSize + 1} 到 {Math.min(currentPage * pageSize, filteredUsers.length)} 条，共 {filteredUsers.length} 条记录
+                  显示 {(currentPage - 1) * pageSize + 1} 到 {Math.min(currentPage * pageSize, total)} 条，共 {total} 条记录
                 </div>
                 <div className="flex items-center space-x-2">
                   <button

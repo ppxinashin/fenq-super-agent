@@ -39,7 +39,7 @@ export class UsersAPI {
   /**
    * 获取用户详情
    */
-  static async getUserById(user_id: number): Promise<ApiResponse<UserInfo>> {
+  static async getUserById(user_id: string): Promise<ApiResponse<UserInfo>> {
     const response = await apiClient.get<ApiResponse<UserInfo>>(`/api/v1/users/${user_id}`);
     return response.data;
   }
@@ -47,7 +47,7 @@ export class UsersAPI {
   /**
    * 删除用户
    */
-  static async deleteUser(user_id: number): Promise<ApiResponse<boolean>> {
+  static async deleteUser(user_id: string): Promise<ApiResponse<boolean>> {
     const response = await apiClient.delete<ApiResponse<boolean>>(`/api/v1/users/${user_id}`);
     return response.data;
   }

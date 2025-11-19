@@ -59,10 +59,12 @@ export interface TokenValidationResponse {
 
 // User Types
 export interface UserInfo {
-  user_id: number;
+  user_id: bigint;  // 使用 bigint 处理雪花号
   username: string;
   role: string;
+  is_deleted?: boolean;
   created_at: string;
+  created_by?: string;
   updated_at?: string;
 }
 
@@ -73,13 +75,13 @@ export interface UserCreateRequest {
 }
 
 export interface UserUpdateRequest {
-  user_id: number;
+  user_id: string;  // 改为string避免BigInt序列化问题
   password?: string;
   role?: string;
 }
 
 export interface UserListItem {
-  user_id: number;
+  user_id: bigint;  // 使用 bigint 处理雪花号
   username: string;
   role: string;
   created_at: string;
@@ -184,13 +186,13 @@ export interface CreateSessionRequest {
 }
 
 export interface CreateSessionResponse {
-  session_id: number;
+  session_id: string;
   agent_id: string;
   title: string;
 }
 
 export interface SessionInfoResponse {
-  session_id: number;
+  session_id: string;
   agent_id: string;
   agent_name: string;
   title: string;
@@ -204,7 +206,7 @@ export interface UpdateSessionTitleRequest {
 }
 
 export interface ChatHistoryResponse {
-  session_id: number;
+  session_id: string;
   messages: ChatMessage[];
 }
 
@@ -215,7 +217,7 @@ export interface ChatMessage {
 }
 
 export interface ChatTitleResponse {
-  session_id: number;
+  session_id: string;
   title: string;
 }
 
@@ -229,20 +231,23 @@ export interface FileUploadResponse {
 }
 
 export interface FileInfo {
-  filename: string;
+  file_name: string;
   source: string;
-  size: number;
+  file_size: number;
   content_type: string;
-  chunk_count: number;
+  total_chunks: number;
   status: string;
+  author: string;
+  minio_bucket: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface FileListResponse {
-  agent_id: string;
-  files: FileInfo[];
+  page: number;
+  page_size: number;
   total: number;
+  data: FileInfo[];
 }
 
 export interface FileChunksResponse {
@@ -300,6 +305,7 @@ export interface FileListParams {
   agent_id: string;
   page?: number;
   page_size?: number;
+  keyword?: string;
 }
 
 export interface ChatParams {

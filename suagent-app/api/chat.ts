@@ -43,7 +43,7 @@ export class ChatAPI {
   /**
    * 生成会话标题
    */
-  static async generateSessionTitle(session_id: number): Promise<ApiResponse<ChatTitleResponse>> {
+  static async generateSessionTitle(session_id: string): Promise<ApiResponse<ChatTitleResponse>> {
     const response = await apiClient.post<ApiResponse<ChatTitleResponse>>(`/api/v1/sessions/${session_id}/generate-title`);
     return response.data;
   }
@@ -51,7 +51,7 @@ export class ChatAPI {
   /**
    * 更新会话标题
    */
-  static async updateSessionTitle(session_id: number, data: UpdateSessionTitleRequest): Promise<ApiResponse<null>> {
+  static async updateSessionTitle(session_id: string, data: UpdateSessionTitleRequest): Promise<ApiResponse<null>> {
     const response = await apiClient.put<ApiResponse<null>>(`/api/v1/sessions/${session_id}/title`, data);
     return response.data;
   }
@@ -59,7 +59,7 @@ export class ChatAPI {
   /**
    * 删除会话
    */
-  static async deleteSession(session_id: number): Promise<ApiResponse<null>> {
+  static async deleteSession(session_id: string): Promise<ApiResponse<null>> {
     const response = await apiClient.delete<ApiResponse<null>>(`/api/v1/sessions/${session_id}`);
     return response.data;
   }
@@ -67,7 +67,7 @@ export class ChatAPI {
   /**
    * 聊天记录
    */
-  static async getSessionMessages(session_id: number): Promise<ApiResponse<ChatHistoryResponse>> {
+  static async getSessionMessages(session_id: string): Promise<ApiResponse<ChatHistoryResponse>> {
     const response = await apiClient.get<ApiResponse<ChatHistoryResponse>>(`/api/v1/sessions/${session_id}/messages`);
     return response.data;
   }

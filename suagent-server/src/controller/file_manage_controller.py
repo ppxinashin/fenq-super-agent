@@ -72,34 +72,38 @@ async def upload_file(
         return business_error_response(f"文件上传失败: {str(e)}")
 
 
-@router.get("/files", response_model=ApiResponse[FileListResponse], summary="文件列表")
+@router.get("/files", response_model=ApiResponse, summary="文件列表")
 @require_roles([UserConsts.USER_ROLE_ADMIN, UserConsts.USER_ROLE_USER])
 async def get_file_list(
     request: Request,
     agent_id: str = Query(..., description="智能体ID"),
     page: int = Query(1, description="页码", ge=1),
-    page_size: int = Query(20, description="每页数量", ge=1, le=100),
+    page_size: int = Query(20, description="每页数量", ge=1, le=20),
+    keyword: Optional[str] = Query(None, description="关键词搜索"),
     current_user: UserInfo = Depends(get_current_user_from_token)
 ):
     """
     查看知识库文件列表
 
     功能点：
-    - 显示文件名、类型、作者、分块数、状态
+    - 从MinIO获取文件列表
+    - 显示文件名、类型、作者、分块数、状态、文件大小
     - 显示创建和更新时间
-    - 支持分页
+    - 支持分页和关键词搜索
+    - 使用通用分页格式返回
 
     权限控制：
     - 用户只能查看自己的文件
     """
     try:
-        logger.info(f"用户查询文件列表: user={current_user.username}, agent_id={agent_id}, page={page}")
+        logger.info(f"用户查询文件列表: user={current_user.username}, agent_id={agent_id}, page={page}, keyword={keyword}")
 
         result = file_manage_service.get_file_list(
             agent_id=agent_id,
             username=current_user.username,
             page=page,
-            page_size=page_size
+            page_size=page_size,
+            keyword=keyword
         )
 
         return success_response(result=result, message="查询成功")
