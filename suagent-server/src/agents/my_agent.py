@@ -31,7 +31,7 @@ class MyAgent:
         llm: Optional[BaseChatModel] = None,
         tools: Optional[List[BaseTool]] = None,
         system_prompt: Optional[str] = None,
-        middlewares: Optional[List[AgentMiddleware[Any, Any]]] = None,
+        middlewares: Optional[List[AgentMiddleware[Any, Any] | AgentMiddleware]] = None,
         checkpointer: Optional[Checkpointer] = None,
         store: Optional[BaseStore] = None,
         chat_id: Optional[int] = None,

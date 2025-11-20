@@ -3,9 +3,17 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 from langchain_core.messages import AIMessageChunk, HumanMessage, ToolMessage, AIMessage
+from langchain.agents.middleware import (
+    TodoListMiddleware,
+    LLMToolSelectorMiddleware,
+    SummarizationMiddleware,
+    ModelCallLimitMiddleware,
+)
 from langchain_core.exceptions import LangChainException
+from langchain_openai import ChatOpenAI
 from openai import BadRequestError as OpenAIBadRequestError
 from src.agents import MyAgent
+from src.config import settings
 from src.mcp_client import MyMCPClient
 from src.memory import RedisShortMemory
 from src.middlewares import get_my_logger_middleware, get_session_middleware
@@ -65,12 +73,32 @@ class ChatService:
                 continue
             tools.append(create_tool(tool))
             
+        long_memory_tool = create_tool("long_memroy")
         if long_memory:
-            tools.append(create_tool("long_memroy"))
+            tools.append(long_memory_tool)
             
         return MyAgent(
             checkpointer = await RedisShortMemory.get_acheckpointer(),
-            middlewares=[get_my_logger_middleware(), get_session_middleware()],
+            middlewares=[
+                # SummarizationMiddleware(
+                #     model=ChatOpenAI(
+                #         name=settings.openai_model
+                #     )
+                # ),
+                TodoListMiddleware(),
+                # LLMToolSelectorMiddleware(
+                #     model=ChatOpenAI(
+                #         name=settings.openai_model
+                #     ),
+                #     max_tools= 10,
+                #     always_include=['long_memroy'] if long_memory else []
+                # ),
+                ModelCallLimitMiddleware(
+                    run_limit=1500
+                ),
+                get_my_logger_middleware(),
+                get_session_middleware()
+            ],
             tools=tools,
             system_prompt=agent_item.system_prompt,
             chat_id=session_id,

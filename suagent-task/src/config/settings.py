@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     mq_dead_letter_exchange: str = Field(default="memory.sync.dlx", description="死信交换机")
     mq_dead_letter_routing_key: str = Field(default="memory.sync.dlx", description="死信路由键")
     mq_dead_letter_queue: str = Field(default="memory.sync.dlx.queue", description="死信队列")
-    mq_message_ttl_ms: int = Field(default=30 * 60 * 1000, description="消息TTL（毫秒）")
+    mq_message_ttl_ms: int = Field(default=4 * 60 * 60 * 1000, description="消息TTL（毫秒），默认4小时")
     mq_prefetch_count: int = Field(default=10, description="消费者预取数量")
     mq_publish_delay_ms: int = Field(default=50, description="生产者发送间隔（毫秒）")
     mq_consumer_max_concurrency: int = Field(default=5, description="消费者同步并发上限")
