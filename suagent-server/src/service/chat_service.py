@@ -80,19 +80,12 @@ class ChatService:
         return MyAgent(
             checkpointer = await RedisShortMemory.get_acheckpointer(),
             middlewares=[
-                # SummarizationMiddleware(
-                #     model=ChatOpenAI(
-                #         name=settings.openai_model
-                #     )
-                # ),
+                SummarizationMiddleware(
+                    model=ChatOpenAI(
+                        name=settings.openai_model
+                    )
+                ),
                 TodoListMiddleware(),
-                # LLMToolSelectorMiddleware(
-                #     model=ChatOpenAI(
-                #         name=settings.openai_model
-                #     ),
-                #     max_tools= 10,
-                #     always_include=['long_memroy'] if long_memory else []
-                # ),
                 ModelCallLimitMiddleware(
                     run_limit=1500
                 ),
