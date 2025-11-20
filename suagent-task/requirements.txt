@@ -1,0 +1,16 @@
+# ===== Core configuration & logging =====
+pydantic==2.12.3
+pydantic-settings==2.10.1
+python-dotenv==1.2.1
+loguru==0.7.3
+
+# ===== Database =====
+SQLAlchemy==2.0.36
+psycopg[binary]==3.2.12
+
+# ===== Scheduler & messaging =====
+apscheduler==3.10.4
+aio-pika==9.4.0
+
+# ===== Storage =====
+minio==7.2.16
