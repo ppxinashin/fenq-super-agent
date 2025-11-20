@@ -1,13 +1,12 @@
-"""RabbitMQ 客户端，封装交换机/队列声明、可靠生产和消费逻辑。"""
+"""RabbitMQ 客户端，仅负责声明拓扑并发布记忆同步任务。"""
 
 import asyncio
 import json
-from typing import Awaitable, Callable, Optional
+from typing import Optional
 
 import aio_pika
 from aio_pika import DeliveryMode, ExchangeType, Message
 from aio_pika.abc import (
-    AbstractIncomingMessage,
     AbstractRobustChannel,
     AbstractRobustConnection,
     AbstractRobustExchange,
@@ -21,7 +20,7 @@ logger = get_logger(__name__)
 
 
 class RabbitMQClient:
-    """负责 RabbitMQ 拓扑声明与可靠消息处理的客户端"""
+    """封装 RabbitMQ 连接、拓扑声明与可靠发布."""
 
     def __init__(self):
         self._connection: Optional[AbstractRobustConnection] = None
@@ -33,7 +32,7 @@ class RabbitMQClient:
         self._lock = asyncio.Lock()
 
     async def connect(self) -> None:
-        """建立连接并声明交换机/队列"""
+        """建立连接并声明 exchange/queue。重复调用可复用现有连接。"""
         async with self._lock:
             if self._connection and not self._connection.is_closed:
                 return
@@ -47,7 +46,7 @@ class RabbitMQClient:
             logger.info("RabbitMQ 连接与队列声明完成")
 
     async def _declare_topology(self) -> None:
-        """声明交换机、主队列、死信队列并建立绑定"""
+        """声明交换机、主队列、死信队列并建立绑定。"""
         assert self._channel, "channel 未初始化"
 
         self._exchange = await self._channel.declare_exchange(
@@ -82,7 +81,7 @@ class RabbitMQClient:
         )
 
     async def publish_memory_task(self, username: str) -> None:
-        """发送用户记忆同步任务，开启发布确认确保写入可靠"""
+        """发布单个用户的记忆同步任务，等待 publisher confirm。"""
         await self.connect()
         assert self._exchange, "exchange 未初始化"
 
@@ -99,82 +98,15 @@ class RabbitMQClient:
                 routing_key=settings.mq_routing_key,
                 mandatory=True,
             )
-            # 在 aio-pika 9.x 中，publisher_confirms=True 时 publish 会等待服务器确认
             logger.info(f"[MQ] 发布记忆同步任务成功 username={username}")
         except aio_pika.exceptions.DeliveryError as exc:
-            logger.error(f"[MQ] 任务未送达（NACK/return） username={username}: {exc}")
+            logger.error(f"[MQ] 任务未送达 username={username}: {exc}")
             raise
         except Exception as exc:
             logger.error(f"[MQ] 发布记忆同步任务失败 username={username}: {exc}")
             raise
 
-    async def consume_memory_tasks(
-        self,
-        handler: Callable[[dict], Awaitable[None]],
-    ) -> None:
-        """注册消费者，收到消息后调用 handler 并在成功后 ACK"""
-        await self.connect()
-        assert self._queue, "queue 未初始化"
-
-        async def _on_message(message: AbstractIncomingMessage) -> None:
-            try:
-                body = message.body.decode("utf-8")
-                payload = json.loads(body)
-                username = payload.get("username")
-                if not username:
-                    logger.error("[MQ] 消息缺少 username 字段，丢弃")
-                    await message.reject(requeue=False)
-                    return
-
-                await handler(payload)
-                await message.ack()
-            except json.JSONDecodeError:
-                logger.error("[MQ] 无法解析消息体，丢弃当前消息")
-                await message.reject(requeue=False)
-            except Exception as exc:
-                logger.error(f"[MQ] 处理消息失败，将重回队列: {exc}")
-                await message.nack(requeue=True)
-
-        await self._queue.consume(_on_message, no_ack=False)
-
-    async def consume_memory_tasks_once(
-        self, handler: Callable[[dict], Awaitable[None]]
-    ) -> int:
-        """
-        批处理消费一次队列中当前积压的消息。
-        Returns 处理的消息数量。
-        """
-        await self.connect()
-        assert self._queue, "queue 未初始化"
-
-        processed = 0
-        while True:
-            try:
-                message = await self._queue.get(timeout=1)
-            except aio_pika.exceptions.QueueEmpty:
-                break
-            try:
-                body = message.body.decode("utf-8")
-                payload = json.loads(body)
-                username = payload.get("username")
-                if not username:
-                    logger.error("[MQ] 消息缺少 username 字段，丢弃")
-                    await message.reject(requeue=False)
-                    continue
-
-                await handler(payload)
-                await message.ack()
-                processed += 1
-            except json.JSONDecodeError:
-                logger.error("[MQ] 无法解析消息体，丢弃当前消息")
-                await message.reject(requeue=False)
-            except Exception as exc:
-                logger.error(f"[MQ] 处理消息失败，将重回队列: {exc}")
-                await message.nack(requeue=True)
-
-        return processed
-
     async def close(self) -> None:
-        """关闭连接资源"""
+        """关闭连接资源。"""
         if self._connection and not self._connection.is_closed:
             await self._connection.close()

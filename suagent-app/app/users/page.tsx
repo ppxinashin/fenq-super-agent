@@ -6,7 +6,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import ConfirmModal from '@/components/ConfirmModal'
 import MobileOnlyNotice from '@/components/MobileOnlyNotice'
-import { FaEdit, FaTrash, FaSearch, FaPlus, FaTimes } from 'react-icons/fa'
+import { FaEdit, FaTrash, FaSearch, FaPlus, FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import { toast } from 'react-hot-toast'
 import { isMobile } from '@/hooks/useMobileRedirect'
 import { UsersAPI } from '@/api'
@@ -65,21 +65,20 @@ export default function UserManagementPage() {
             created_at: item.created_at,
             created_by: item.created_by || ''
           }))
-          // 设置分页信息
-          setTotal(response.result?.total || 0)
-          setTotalPages(Math.ceil((response.result?.total || 0) / size))
-          setCurrentPage(response.result?.page || page)
-        } else {
+          } else {
           // 其他情况，设为空数组
           usersArray = []
         }
 
-        // 如果没有分页信息，使用默认值
-        if (total === 0 && usersArray.length > 0) {
-          setTotal(usersArray.length)
-          setTotalPages(Math.ceil(usersArray.length / size))
-          setCurrentPage(page)
-        }
+        // 确保分页信息正确设置
+        const apiTotal = response.result?.total || 0
+        const apiTotalPages = response.result?.total_pages || Math.ceil(apiTotal / size)
+        const apiCurrentPage = response.result?.page || page
+
+        // 设置分页信息，优先使用API返回的值
+        setTotal(apiTotal)
+        setTotalPages(apiTotalPages)
+        setCurrentPage(apiCurrentPage)
 
         setUsers(usersArray)
         setFilteredUsers(usersArray)
@@ -149,6 +148,45 @@ export default function UserManagementPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
+  }
+
+  const getPaginationButtons = () => {
+    const buttons = []
+
+    if (totalPages <= 5) {
+      // 如果总页数小于等于5，显示所有页码
+      for (let i = 1; i <= totalPages; i++) {
+        buttons.push(i)
+      }
+    } else {
+      // 如果总页数大于5，需要智能显示
+      if (currentPage <= 3) {
+        // 当前页在前面，显示 1,2,3,4,5,...,totalPages
+        for (let i = 1; i <= 5; i++) {
+          buttons.push(i)
+        }
+        buttons.push('...')
+        buttons.push(totalPages)
+      } else if (currentPage >= totalPages - 2) {
+        // 当前页在后面，显示 1,...,totalPages-4,totalPages-3,totalPages-2,totalPages-1,totalPages
+        buttons.push(1)
+        buttons.push('...')
+        for (let i = totalPages - 4; i <= totalPages; i++) {
+          buttons.push(i)
+        }
+      } else {
+        // 当前页在中间，显示 1,...,currentPage-1,currentPage,currentPage+1,...,totalPages
+        buttons.push(1)
+        buttons.push('...')
+        buttons.push(currentPage - 1)
+        buttons.push(currentPage)
+        buttons.push(currentPage + 1)
+        buttons.push('...')
+        buttons.push(totalPages)
+      }
+    }
+
+    return buttons
   }
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -477,14 +515,18 @@ export default function UserManagementPage() {
                     disabled={currentPage === 1}
                     className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:disabled:bg-transparent"
                   >
-                    <FaTimes className="text-xs rotate-180" />
+                    <FaChevronLeft className="text-xs" />
                   </button>
-                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                    const page = i + 1
+                  {getPaginationButtons().map((page, index) => {
+                    if (page === '...') {
+                      return (
+                        <span key={`ellipsis-${index}`} className="text-gray-500 px-3 py-1">...</span>
+                      )
+                    }
                     return (
                       <button
                         key={page}
-                        onClick={() => handlePageChange(page)}
+                        onClick={() => handlePageChange(Number(page))}
                         className={`px-3 py-1 rounded transition-all duration-200 ${
                           currentPage === page
                             ? 'bg-indigo-600 text-white'
@@ -495,13 +537,12 @@ export default function UserManagementPage() {
                       </button>
                     )
                   })}
-                  {totalPages > 5 && <span className="text-gray-500">...</span>}
                   <button
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
                     className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:disabled:bg-transparent"
                   >
-                    <FaTimes className="text-xs" />
+                    <FaChevronRight className="text-xs" />
                   </button>
                 </div>
               </div>

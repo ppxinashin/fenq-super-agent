@@ -1,3 +1,4 @@
+from __future__ import annotations
 """MQ 消费者：并发消费用户记忆同步任务，确保幂等与 ACK。"""
 
 import asyncio
@@ -9,6 +10,9 @@ from src.service.memory_setting_service import memory_setting_service
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+_global_consumer: "MemorySyncConsumer" | None = None
 
 
 class MemorySyncConsumer:
@@ -23,6 +27,15 @@ class MemorySyncConsumer:
         """启动消费者监听"""
         await self.mq_client.consume_memory_tasks(self._handle_message)
         logger.info("记忆同步消费者已启动，等待消息...")
+
+    async def run_once(self) -> int:
+        """批处理消费当前队列，返回处理条数"""
+        processed = await self.mq_client.consume_memory_tasks_once(self._handle_message)
+        if processed:
+            logger.info(f"[MQ] 本轮消费完成，处理 {processed} 条消息")
+        else:
+            logger.info("[MQ] 本轮消费无待处理消息")
+        return processed
 
     def _get_user_lock(self, username: str) -> asyncio.Lock:
         """每个用户一个锁，防止同一用户并发同步导致状态漂移"""
@@ -43,3 +56,16 @@ class MemorySyncConsumer:
                 logger.info(f"[MQ] 开始执行用户 {username} 的记忆同步")
                 await memory_setting_service.sync_user_memory(username)
                 logger.info(f"[MQ] 完成用户 {username} 的记忆同步")
+
+
+def set_global_consumer(consumer: MemorySyncConsumer) -> None:
+    """注册全局 consumer，便于 APScheduler 序列化调用"""
+    global _global_consumer
+    _global_consumer = consumer
+
+
+async def run_memory_consume_job() -> None:
+    """供 APScheduler 调度的消费入口"""
+    if not _global_consumer:
+        raise RuntimeError("MemorySyncConsumer 未初始化")
+    await _global_consumer.run_once()

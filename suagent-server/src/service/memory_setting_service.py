@@ -3,16 +3,12 @@
 """
 
 import asyncio
-import time
-from typing import Optional
-from sqlalchemy.orm import Session
+
 from src.model.crud_user_memory_setting import crud_user_memory_setting
-from src.model.crud_session_log import CRUDSessionLog
 from src.model.database import get_db
-from src.model.session_log import SessionLog
 from src.minio_client.my_minio import MyMinio
+from src.mq import RabbitMQClient
 from src.utils.logger import get_logger
-from src.config.settings import settings
 
 logger = get_logger(__name__)
 
@@ -22,7 +18,7 @@ class MemorySettingService:
 
     def __init__(self):
         self.minio_client = MyMinio()
-        self.session_log_crud = CRUDSessionLog(SessionLog)
+        self.mq_client = RabbitMQClient()
 
     def get_memory_status(self, username: str) -> bool:
         """
@@ -47,26 +43,20 @@ class MemorySettingService:
         """
         设置用户记忆开关
 
-        Args:
-            username: 用户名
-            enabled: 开关状态
-
-        Returns:
-            bool: 设置是否成功
+        - 开启：仅更新状态，由定时任务消费队列统一同步
+        - 关闭：将 MinIO 中该用户的记忆文件异步清理
         """
         db = next(get_db())
         try:
-            # 设置记忆开关
-            setting = crud_user_memory_setting.set_enabled(
+            crud_user_memory_setting.set_enabled(
                 db=db,
                 username=username,
                 enabled=enabled,
                 updated_by=username
             )
 
-            if enabled:
-                # 如果开启记忆，异步执行记忆文档上传
-                asyncio.create_task(self._upload_memory_document(username))
+            if not enabled:
+                self._schedule_delete_memory(username)
 
             logger.info(f"用户 {username} 记忆开关设置成功: {enabled}")
             return True
@@ -77,84 +67,28 @@ class MemorySettingService:
         finally:
             db.close()
 
-    def sync_memory(self, username: str) -> str:
+    async def sync_memory(self, username: str) -> str:
         """
-        手动同步长期记忆
-
-        Args:
-            username: 用户名
-
-        Returns:
-            str: 操作消息
+        手动同步长期记忆：改为将任务投递到消息队列，由定时任务统一消费。
         """
         try:
-            # 异步执行记忆文档上传
-            asyncio.create_task(self._upload_memory_document(username))
-
-            logger.info(f"用户 {username} 记忆同步已启动")
-            return "记忆同步已启动，正在后台处理"
-
+            await self.mq_client.publish_memory_task(username)
+            logger.info(f"用户 {username} 记忆同步任务已投递到消息队列")
+            return "已提交同步申请"
         except Exception as e:
-            logger.error(f"同步用户记忆失败: {e}")
-            return "同步记忆失败，请稍后重试"
+            logger.error(f"投递记忆同步任务失败: {e}")
+            return "提交同步申请失败，请稍后重试"
 
-    async def _upload_memory_document(self, username: str):
-        """
-        异步上传记忆文档到MinIO
-
-        Args:
-            username: 用户名
-        """
+    def _schedule_delete_memory(self, username: str) -> None:
+        """关闭长期记忆时删除 MinIO 记录，优先放入事件循环线程池避免阻塞。"""
         try:
-            logger.info(f"开始为用户 {username} 上传记忆文档")
+            loop = asyncio.get_running_loop()
+            loop.create_task(asyncio.to_thread(self._delete_existing_memory_files, username))
+        except RuntimeError:
+            # 未在事件循环中，退化为同步执行
+            self._delete_existing_memory_files(username)
 
-            # 查询用户的聊天记录
-            db = next(get_db())
-            try:
-                # 先删除现有的记忆文件
-                await self._delete_existing_memory_files(username)
-
-                # 获取该用户的所有会话日志
-                session_logs = self.session_log_crud.get_by_username(
-                    db=db,
-                    username=username
-                )
-
-                if not session_logs:
-                    logger.info(f"用户 {username} 没有聊天记录，跳过记忆文档上传")
-                    return
-
-                # 格式化聊天记录为Markdown格式
-                memory_content = '\n\n'.join([
-                    f'**{session.role}**\n\n{session.content}'
-                    for session in session_logs
-                ])
-
-                # 生成文档路径：memory/user_id/unix时间戳.md
-                timestamp = int(time.time())
-                object_name = f"memory/{username}/{timestamp}.md"
-
-                # 上传到MinIO
-                from io import BytesIO
-                data_stream = BytesIO(memory_content.encode('utf-8'))
-                self.minio_client.put_object(
-                    object_name=object_name,
-                    data=data_stream,
-                    length=len(memory_content.encode('utf-8')),
-                    content_type='text/markdown'
-                )
-
-                logger.info(f"用户 {username} 记忆文档上传成功: {object_name}")
-
-            except Exception as e:
-                logger.error(f"用户 {username} 记忆文档上传失败: {e}")
-            finally:
-                db.close()
-
-        except Exception as e:
-            logger.error(f"异步上传记忆文档异常: {e}")
-
-    async def _delete_existing_memory_files(self, username: str):
+    def _delete_existing_memory_files(self, username: str) -> None:
         """
         删除用户现有的所有记忆文件
 
@@ -165,11 +99,7 @@ class MemorySettingService:
             memory_prefix = f"memory/{username}/"
             delete_count = 0
 
-            # 列出所有匹配的对象
-            objects = self.minio_client.list_objects(prefix=memory_prefix, recursive=True)
-
-            # 删除所有找到的对象
-            for obj in objects:
+            for obj in self.minio_client.list_objects(prefix=memory_prefix, recursive=True):
                 self.minio_client.remove_object(obj.object_name)
                 delete_count += 1
 

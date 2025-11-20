@@ -166,7 +166,7 @@ async def set_memory_setting(
     - 用户可设置记忆开关状态
     - 状态持久化存储到 user_memory_settings 表
     - 查到了就修改状态，没查到就添加一个记录
-    - 开启开关后，异步上传聊天记录到MinIO
+    - 开启后由定时任务统一同步；关闭时会清理 MinIO 中的长期记忆文件
     """
     try:
         logger.info(f"用户设置记忆开关: username={current_user.username}, enabled={memory_request.enabled}")
@@ -232,7 +232,7 @@ async def sync_memory(
 
     功能点：
     - 判断用户是否开启了长期记忆
-    - 如果开启了，异步执行记忆文档上传
+    - 如果开启了，将同步任务投递到消息队列，由定时任务消费
     - 如果没开启，返回299状态码提示用户
     """
     try:
@@ -243,7 +243,7 @@ async def sync_memory(
             return error_response("用户未开启长期记忆功能")
 
         # 执行记忆同步
-        message = memory_setting_service.sync_memory(current_user.username)
+        message = await memory_setting_service.sync_memory(current_user.username)
 
         return success_response(
             result=True,

@@ -3,8 +3,10 @@
 """
 
 from typing import Optional
-from pydantic_settings import BaseSettings
+from urllib.parse import quote
+
 from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -78,6 +80,31 @@ class Settings(BaseSettings):
             return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
         return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
+    # ===== RabbitMQ 配置 =====
+    rabbitmq_host: str = Field(default="localhost", description="RabbitMQ 主机")
+    rabbitmq_port: int = Field(default=5672, description="RabbitMQ 端口")
+    rabbitmq_username: str = Field(default="guest", description="RabbitMQ 用户名")
+    rabbitmq_password: str = Field(default="guest", description="RabbitMQ 密码")
+    rabbitmq_virtual_host: str = Field(default="/", description="RabbitMQ vhost")
+
+    mq_exchange: str = Field(default="memory.sync", description="主交换机")
+    mq_routing_key: str = Field(default="memory.sync", description="路由键")
+    mq_queue: str = Field(default="memory.sync.queue", description="主队列")
+    mq_dead_letter_exchange: str = Field(default="memory.sync.dlx", description="死信交换机")
+    mq_dead_letter_routing_key: str = Field(default="memory.sync.dlx", description="死信路由键")
+    mq_dead_letter_queue: str = Field(default="memory.sync.dlx.queue", description="死信队列")
+    mq_message_ttl_ms: int = Field(default=30 * 60 * 1000, description="消息TTL（毫秒）")
+    mq_prefetch_count: int = Field(default=10, description="消费者预取数量")
+
+    @property
+    def rabbitmq_url(self) -> str:
+        """构建 AMQP 连接串"""
+        vhost = quote(self.rabbitmq_virtual_host, safe="")
+        return (
+            f"amqp://{self.rabbitmq_username}:{self.rabbitmq_password}"
+            f"@{self.rabbitmq_host}:{self.rabbitmq_port}/{vhost}"
+        )
+
     # ===== 向量存储配置 =====
     embedding_model: str = Field(default="text-embedding-v4", description="嵌入模型")
     vector_store_collection: str = Field(default="suagent_documents", description="向量库集合名称")
@@ -105,4 +132,3 @@ class Settings(BaseSettings):
 
 # 全局配置实例
 settings = Settings()
-

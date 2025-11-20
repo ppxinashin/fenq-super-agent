@@ -40,7 +40,18 @@ class Settings(BaseSettings):
         default=300, description="调度器错过执行的容忍窗口（秒）"
     )
     memory_sync_interval_minutes: int = Field(
-        default=120, description="定时同步周期（分钟）"
+        default=120, description="定时同步生产周期（分钟，默认2小时，现需覆写为每天2点的cron触发）"
+    )
+    memory_sync_cron_hour: int = Field(default=2, description="每日生产任务小时（24h制）")
+    memory_sync_cron_minute: int = Field(default=0, description="每日生产任务分钟")
+    memory_consume_interval_minutes: int = Field(
+        default=120, description="消费批处理旧参数（保留兼容，不再使用）"
+    )
+    memory_consume_cron_hours: str = Field(
+        default="0-23/2", description="消费任务小时表达式（cron）"
+    )
+    memory_consume_cron_minute: int = Field(
+        default=30, description="消费任务分钟（与生产错开30分钟）"
     )
 
     # ===== RabbitMQ 配置 =====
