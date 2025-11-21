@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional
 
 from langchain_core.messages import AIMessageChunk, HumanMessage, ToolMessage, AIMessage
@@ -43,6 +43,21 @@ class ChatService:
         self.curd_session = CRUDSession(Session)
         self.curd_session_log = CRUDSessionLog(SessionLog)
         self.id_generator = Snowflake(worker_id=1, datacenter_id=1)
+    
+    def _extract_checkpoint_messages(self, state) -> List:
+        """从checkpointer返回的数据中提取messages列表"""
+        if not state:
+            return []
+        
+        messages = None
+        if isinstance(state, dict):
+            messages = state.get("messages") or state.get("channel_values", {}).get("messages")
+        elif hasattr(state, "channel_values"):
+            messages = state.channel_values.get("messages")
+        elif hasattr(state, "messages"):
+            messages = getattr(state, "messages", None)
+        
+        return messages or []
 
     async def _chat_agent(self, session_id: int, agent_id: str, user_id: str, long_memory: bool = False) -> MyAgent:
         """
@@ -522,39 +537,110 @@ class ChatService:
             if session.created_by != user_id:
                 raise ValueError("无权限查看此会话记录")
 
-            # 查询前一天内的聊天记录
-            cutoff_time = datetime.now() - timedelta(days=1)
-            logs = db.query(SessionLog).filter(
-                SessionLog.session_id == session_id,
-                SessionLog.is_deleted == False,
-                SessionLog.created_at >= cutoff_time
-            ).order_by(SessionLog.created_at).limit(20).all()
+            # 先尝试从checkpointer获取
+            messages_from_checkpoint: List = []
+            try:
+                checkpointer = RedisShortMemory.get_checkpointer()
+                config = {"configurable": {"thread_id": f"{session.agent_id}_{session_id}"}}
+                state = checkpointer.get(config)
+                messages_from_checkpoint = self._extract_checkpoint_messages(state)
+            except Exception as e:
+                logger.warning(f"从checkpointer获取消息失败，回退到数据库: {e}")
 
-            # 按轮次分组（人机交互算一轮）
-            messages = []
-            current_round = []
-            round_count = 0
+            logs_source: List[ChatMessageResponse] = []
+            if messages_from_checkpoint:
+                # 使用checkpointer中的messages
+                for msg in messages_from_checkpoint:
+                    role = None
+                    if isinstance(msg, HumanMessage):
+                        role = "user"
+                    elif isinstance(msg, AIMessage):
+                        role = "assistant"
+                    else:
+                        continue  # 跳过工具等其他消息
 
-            for log in logs:
-                current_round.append(ChatMessageResponse(
-                    role=log.role,
-                    content=log.content,
-                    created_at=log.created_at
+                    content = getattr(msg, "content", None)
+                    if isinstance(content, list):
+                        content = "\n".join(str(part) for part in content)
+                    created_at = None
+                    # 尝试从additional_kwargs/response_metadata读取时间
+                    for source_dict in [
+                        getattr(msg, "additional_kwargs", None),
+                        getattr(msg, "response_metadata", None),
+                    ]:
+                        if source_dict and isinstance(source_dict, dict):
+                            ts = source_dict.get("created_at") or source_dict.get("timestamp") or source_dict.get("ts")
+                            if ts:
+                                try:
+                                    if isinstance(ts, (int, float)):
+                                        created_at = datetime.fromtimestamp(ts)
+                                    elif isinstance(ts, str):
+                                        created_at = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                                except Exception:
+                                    created_at = None
+                    if created_at is None:
+                        created_at = datetime.now()
+
+                    logs_source.append(ChatMessageResponse(role=role, content=str(content), created_at=created_at))
+            else:
+                # 查询该会话的全部聊天记录（按时间顺序）
+                db_logs = db.query(SessionLog).filter(
+                    SessionLog.session_id == session_id,
+                    SessionLog.is_deleted == False,
+                ).order_by(SessionLog.created_at).all()
+                for log in db_logs:
+                    logs_source.append(ChatMessageResponse(
+                        role=log.role,
+                        content=log.content,
+                        created_at=log.created_at
+                    ))
+
+            # 组装为轮次：每个user开头，直到下一个user前的所有assistant合并为一条
+            rounds = []
+            current_user: Optional[ChatMessageResponse] = None
+            assistant_contents: List[str] = []
+            assistant_created_at = None
+            separator = "\n\n---\n\n"  # 用分隔符保留原assistants的分界
+
+            for log in logs_source:
+                if log.role == "user":
+                    # 收集上一轮（需包含user和至少一个assistant才算完整）
+                    if current_user and assistant_contents:
+                        rounds.append((current_user, assistant_contents, assistant_created_at))
+                    # 开启新一轮
+                    current_user = ChatMessageResponse(
+                        role=log.role,
+                        content=log.content,
+                        created_at=log.created_at
+                    )
+                    assistant_contents = []
+                    assistant_created_at = None
+                elif log.role == "assistant":
+                    # 只有在存在user起点时才记入本轮
+                    if current_user:
+                        assistant_contents.append(log.content)
+                        if assistant_created_at is None:
+                            assistant_created_at = log.created_at
+                else:
+                    # 其他角色暂不参与轮次合并，跳过
+                    continue
+
+            # 收集最后一轮（完整轮次）
+            if current_user and assistant_contents:
+                rounds.append((current_user, assistant_contents, assistant_created_at))
+
+            # 取最新5轮
+            recent_rounds = rounds[-5:]
+
+            # 按轮次展开，并合并assistant内容
+            messages: List[ChatMessageResponse] = []
+            for user_msg, assistant_parts, assistant_time in recent_rounds:
+                messages.append(user_msg)
+                messages.append(ChatMessageResponse(
+                    role="assistant",
+                    content=separator.join(assistant_parts),
+                    created_at=assistant_time
                 ))
-
-                # 如果是助手回复且当前轮次不为空，表示一轮结束
-                if log.role == "assistant" and current_round:
-                    messages.extend(current_round)
-                    current_round = []
-                    round_count += 1
-
-                    # 限制5轮对话
-                    if round_count >= 5:
-                        break
-
-            # 添加最后一轮（如果没有完整结束）
-            if current_round and round_count < 5:
-                messages.extend(current_round)
 
             return ChatHistoryResponse(
                 session_id=session_id,

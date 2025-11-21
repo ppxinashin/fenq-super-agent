@@ -173,7 +173,7 @@ export default function MarketPage() {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     className="w-full pl-10 pr-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-inset-0"
                     placeholder="搜索智能体..."
                   />
@@ -205,7 +205,7 @@ export default function MarketPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {displayAgents.map((agent, index) => (
+              {displayAgents.map((agent) => (
                 <div
                   key={agent.agent_id}
                   onClick={() => handleAgentClick(agent.agent_id, agent.agent_name)}
@@ -244,35 +244,35 @@ export default function MarketPage() {
           )}
 
           {/* 加载更多 */}
-          {!initialLoading && hasMore && (
+          {!initialLoading && agents.length > 0 && (
             <div className="mt-12 text-center">
-              <button
-                onClick={handleLoadMore}
-                disabled={loading}
-                className="px-8 py-3 border border-gray-300 rounded-xl text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center mx-auto space-x-2"
-              >
-                {loading ? (
-                  <>
-                    <FaSpinner className="animate-spin" />
-                    <span>加载中...</span>
-                  </>
-                ) : (
-                  <>
-                    <FaSpinner />
-                    <span>加载更多</span>
-                  </>
-                )}
-              </button>
+              {hasMore ? (
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loading}
+                  className="px-8 py-3 border border-gray-300 rounded-xl text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center mx-auto space-x-2"
+                >
+                  {loading ? (
+                    <>
+                      <FaSpinner className="animate-spin" />
+                      <span>加载中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FaSpinner />
+                      <span>显示更多智能体</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <div className="px-8 py-3 text-gray-500 text-sm">
+                  已加载全部智能体
+                </div>
+              )}
             </div>
           )}
 
-          {/* 显示总数信息 */}
-          {!initialLoading && agents.length > 0 && (
-            <div className="mt-8 text-center text-sm text-gray-500">
-              已显示 {Math.min(agents.length, 8)} 个智能体
-            </div>
-          )}
-        </main>
+            </main>
 
         <Footer />
       </div>

@@ -1,0 +1,66 @@
+networks:
+  suagent-network:
+    driver: bridge
+
+services:
+  suagent-server:
+    build: ./suagent-server
+    env_file:
+      - ./suagent-server/.env
+    ports:
+      - "8000:8000"
+    networks:
+      - suagent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  suagent-app:
+    build: ./suagent-app
+    depends_on:
+      - suagent-server
+    env_file:
+      - ./suagent-app/.env
+    ports:
+      - "11451:11451"
+    networks:
+      - suagent-network
+    restart: unless-stopped
+
+  suagent-rag:
+    build: ./suagent-rag
+    env_file:
+      - ./suagent-rag/.env
+    networks:
+      - suagent-network
+    restart: unless-stopped
+
+  suagent-task:
+    build: ./suagent-task
+    env_file:
+      - ./suagent-task/.env
+    networks:
+      - suagent-network
+    restart: unless-stopped
+
+  suagent-youtube-mcp:
+    build: ./suagent-youtube-mcp
+    env_file:
+      - ./suagent-youtube-mcp/.env
+    depends_on:
+      - suagent-server
+    ports:
+      - "10086:10086"
+    networks:
+      - suagent-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; socket.create_connection(('localhost',10086), timeout=3).close()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped

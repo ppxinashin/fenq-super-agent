@@ -1,0 +1,40 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (for workflow files)
+        uses: actions/checkout@v4
+
+      # 配置以下仓库密钥
+      - name: Remote deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+            cd /home/ubuntu/fenq-super-agent
+            git fetch --all
+            git checkout ${GITHUB_REF##*/}
+            git pull origin ${GITHUB_REF##*/}
+            docker compose down -v --remove-orphans || true
+            docker compose up -d --build
+            retries=10
+            for i in $(seq 1 $retries); do
+              if curl -fsS http://localhost:8000/health > /dev/null; then
+                echo "suagent-server is healthy"
+                exit 0
+              fi
+              echo "Waiting for suagent-server to be ready (${i}/${retries})"
+              sleep 6
+            done
+            echo "Health check failed"
+            exit 1
