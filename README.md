@@ -331,7 +331,7 @@ docker-compose ps
 **Q: 数据库连接失败**
 ```bash
 # 验证数据库连接
-docker exec -it postgres psql -U suagent -d suagent -c "SELECT 1;"
+psql -U suagent -d suagent -c "SELECT 1;"
 ```
 
 **Q: 前端无法访问后端**
