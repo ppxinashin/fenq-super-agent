@@ -11,20 +11,23 @@ jobs:
       - name: Checkout repository (for workflow files)
         uses: actions/checkout@v4
 
-      # 配置以下仓库密钥
+      # 配置以下仓库密钥：
+      # SSH_HOST=43.160.245.141, SSH_USER=ubuntu, SSH_KEY=su_agent.pem 全量私钥内容, SSH_PORT=22（可选）
       - name: Remote deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          BRANCH: "${{ github.ref_name }}"
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT }}
+          port: ${{ secrets.SSH_PORT || 22 }}
           script: |
             set -e
             cd /home/ubuntu/fenq-super-agent
             git fetch --all
-            git checkout ${GITHUB_REF##*/}
-            git pull origin ${GITHUB_REF##*/}
+            git checkout "$BRANCH"
+            git pull origin "$BRANCH"
             docker compose down -v --remove-orphans || true
             docker compose up -d --build
             retries=10
