@@ -77,11 +77,19 @@ class ChatService:
             raise ValueError(f"Agent {agent_id} not found")
         
         tools = []
+        mcp_tools: List = []
         
         # 异步踩坑 - 使用 astream() 时必须使用异步 checkpointer
         if agent_item.mcp_status:
-            mcp = MyMCPClient(mcp_servers=json.loads(agent_item.mcp_config))
-            tools = await mcp.get_tools()
+            try:
+                mcp_config = json.loads(agent_item.mcp_config) if isinstance(agent_item.mcp_config, str) else (agent_item.mcp_config or {})
+                mcp = MyMCPClient(mcp_servers=mcp_config)
+                mcp_tools = await mcp.get_tools()
+            except Exception as e:
+                # 如果MCP不可用（网络/服务未启动），记录后退回无MCP模式
+                logger.warning(f"加载MCP工具失败，已忽略MCP: agent_id={agent_id}, error={e}", exc_info=True)
+        
+        tools.extend(mcp_tools)
         
         for tool in agent_item.tools:
             if tool == "long_memroy":
