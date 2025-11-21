@@ -13,10 +13,12 @@ jobs:
 
       # 配置以下仓库密钥：
       # SSH_HOST=43.160.245.141, SSH_USER=ubuntu, SSH_KEY=su_agent.pem 全量私钥内容, SSH_PORT=22（可选）
+      # 可选：GH_PAT=具有该仓库读权限的 PAT（若远端拉取代码需要认证）
       - name: Remote deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
         env:
           BRANCH: "${{ github.ref_name }}"
+          GH_PAT: ${{ secrets.GH_PAT }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -25,6 +27,10 @@ jobs:
           script: |
             set -e
             cd /home/ubuntu/fenq-super-agent
+            if [ -n "$GH_PAT" ]; then
+              git config --global url."https://${GH_PAT}@github.com/".insteadOf "https://github.com/"
+              git remote set-url origin https://github.com/${{ github.repository }}
+            fi
             git fetch --all
             git checkout "$BRANCH"
             git pull origin "$BRANCH"
