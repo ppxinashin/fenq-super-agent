@@ -391,7 +391,7 @@ curl -H "Origin: http://localhost:11451" http://localhost:8000/health
 
 Made with ❤️ by Jehol FENQ
 
-**© 2024 Fenq Super Agent. All rights reserved.**
+**© 2025 Fenq Super Agent. All rights reserved.**
 
 </div>
 
