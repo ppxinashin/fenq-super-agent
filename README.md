@@ -5,7 +5,7 @@
 ![Fenq Super Agent](https://img.shields.io/badge/AUTHOR-JEHOL%20FENQ-blue?style=for-the-badge)
 ![Multi-Agent](https://img.shields.io/badge/Architecture-Micro--Service-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-Apache-yellow?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-2.1.0-orange?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.1.0-orange?style=for-the-badge)
 
 [快速开始(后发)](#-快速开始) • [项目文档(后发)](#-详细文档) • [在线演示](http://suagent.jehol-ppx.com/) • [API文档](https://fenq-suagent.apifox.cn/)
 
@@ -23,6 +23,9 @@
 ## 🌟 项目简介
 
 Fenq Super Agent 是一个企业级的多智能体交互系统，采用现代化的微服务架构。项目基于 **LangChain 1.0.3 + LangGraph 1.0.2** 构建，集成先进的大语言模型技术、向量检索、消息队列和容器化部署，支持高度可扩展的智能体生态。
+
+项目灵感来源，非常感谢鱼皮老哥<br/>
+[AI 超级智能体项目 RAG + MCP + 大模型本地部署 —— 鱼皮原版](https://www.codefather.cn/vip?shareCode=y3xdkr)
 
 ### 🎯 核心特性
 
@@ -341,134 +344,16 @@ curl -H "Origin: http://localhost:11451" http://localhost:8000/health
 ```
 
 **Q: MCP代理失败**
-可以参考下我的配置，就看mcp.jehol-ppx.com就行
-```nginx
-map $http_upgrade $connection_upgrade {
-    default upgrade;
-    ''      close;
-}
 
-# suagent-app via domain
-server {
-    listen 80;
-    listen [::]:80;
-    server_name suagent.jehol-ppx.com;
+可以参考下[我的配置](NGINX_DEPLOYMENT.md)，就看mcp.jehol-ppx.com就行
 
-    location / {
-        proxy_pass http://127.0.0.1:11451;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $connection_upgrade;
-    }
-}
-
-# suagent-server via domain path /suagent -> upstream on 8000
-server {
-    listen 80;
-    listen [::]:80;
-    server_name api.jehol-ppx.com;
-
-    location = /suagent {
-        return 301 /suagent/;
-    }
-
-    location /suagent/ {
-        proxy_pass http://127.0.0.1:8000/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $connection_upgrade;
-    }
-
-    # all else 404
-    location / {
-        return 404;
-    }
-}
-
-# suagent-youtube-mcp via domain (SSE streaming)
-server {
-    listen 80;
-    listen [::]:80;
-    server_name mcp.jehol-ppx.com;
-
-    # /youtube/sse -> upstream /sse
-    location /youtube/sse {
-        proxy_pass http://127.0.0.1:10086/sse;
-
-        # SSE core
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # buffering/cache
-        proxy_buffering off;
-        proxy_cache off;
-        chunked_transfer_encoding on;
-
-        # timeouts
-        proxy_read_timeout 86400s;
-        proxy_send_timeout 86400s;
-        keepalive_timeout 86400s;
-        proxy_next_upstream off;
-
-        # SSE headers
-        add_header Content-Type 'text/event-stream';
-        add_header Cache-Control 'no-cache';
-
-        # CORS
-        add_header 'Access-Control-Allow-Origin' '*' always;
-        add_header 'Access-Control-Allow-Methods' 'GET, OPTIONS' always;
-        add_header 'Access-Control-Allow-Headers' 'DNT,X-Mx-ReqToken,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type' always;
-
-        # preflight
-        if ($request_method = 'OPTIONS') {
-            add_header 'Access-Control-Max-Age' 1728000;
-            add_header 'Content-Type' 'text/plain charset=UTF-8';
-            add_header 'Content-Length' 0;
-            return 204;
-        }
-    }
-
-    # proxy other MCP HTTP endpoints (e.g., /messages)
-    location / {
-        proxy_pass http://127.0.0.1:10086;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Connection "";
-        proxy_read_timeout 300s;
-        proxy_send_timeout 300s;
-    }
-}
-
-# catch-all
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    server_name _;
-    return 404;
-}
-```
 设置可以参考
 ```json
 {
   "mcpServers": {
     "suagent-youtube-mcp": {
       "type": "sse",
-      "url": "http://mcp.jehol-ppx.com/youtube/sse"
+      "url": "https://mcp.jehol-ppx.com/youtube/sse"
     }
   }
 }
@@ -508,7 +393,7 @@ server {
 
 ## 📞 联系方式
 
-- **项目维护者**: Jehol FENQ
+- **项目维护者**: 热河fen青
 - **GitHub Issues**: [提交问题](https://github.com/jeholppx/fenq-super-agent/issues)
 - **在线演示**: [http://suagent.jehol-ppx.com/](http://suagent.jehol-ppx.com/)
 
