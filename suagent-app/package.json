@@ -18,7 +18,7 @@
     "axios": "^1.13.2",
     "crypto-js": "^4.2.0",
     "mui-markdown": "^2.0.3",
-    "next": "16.0.3",
+    "next": "^16.0.7",
     "next-auth": "^4.24.13",
     "prism-react-renderer": "^2.4.1",
     "react": "19.2.0",

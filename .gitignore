@@ -1,3 +1,7 @@
 # 全局忽略
 *.log*
 *.bak*
+
+# ai
+.claude
+.gemini
